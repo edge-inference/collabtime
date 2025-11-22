@@ -913,9 +913,9 @@ class ExperimentRunner:
                 },
                 'simulation': {
                     'mode': simulation_config.get('mode', 'distributed'),
-                    'duration_s': simulation_config.get('duration', 0),
+                    'duration_s': self.duration_override if self.duration_override is not None else simulation_config.get('duration', 0),
                     'step_interval_ms': simulation_config.get('step_interval', 50),
-                    'total_steps': int(simulation_config.get('duration', 0) * 1000 / simulation_config.get('step_interval', 50)),
+                    'total_steps': int((self.duration_override if self.duration_override is not None else simulation_config.get('duration', 0)) * 1000 / simulation_config.get('step_interval', 50)),
                     'seed': simulation_config.get('seed')
                 },
                 'tasks': {
