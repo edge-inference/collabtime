@@ -28,6 +28,13 @@ from config import (
     MAX_AOI_MS
 )
 
+try:
+    from perf.astar_fast import astar_fast
+    CYTHON_ASTAR_AVAILABLE = True
+except ImportError:
+    CYTHON_ASTAR_AVAILABLE = False
+    astar_fast = None
+
 
 class AgentState(Enum):
     IDLE = "idle"
@@ -470,13 +477,24 @@ class RobotAgent(mesa.Agent):
         Uses local cache with gossip - eventual consistency.
         """
         try:
-            path = astar_with_congestion(
-                warehouse=self.model.warehouse,
-                dsm_api=self.local_cache,
-                start=from_node,
-                goal=to_node,
-                cost_params={'alpha': 2.0, 'beta': 0.5, 'max_aoi_ms': MAX_AOI_MS}
-            )
+            cost_params = {'alpha': 2.0, 'beta': 0.5, 'max_aoi_ms': MAX_AOI_MS}
+            
+            if CYTHON_ASTAR_AVAILABLE and self.model.use_cython:
+                path = astar_fast(
+                    warehouse=self.model.warehouse,
+                    dsm_api=self.local_cache,
+                    start=from_node,
+                    goal=to_node,
+                    cost_params=cost_params
+                )
+            else:
+                path = astar_with_congestion(
+                    warehouse=self.model.warehouse,
+                    dsm_api=self.local_cache,
+                    start=from_node,
+                    goal=to_node,
+                    cost_params=cost_params
+                )
             if not path:
                 self.model.logger.error(f"Agent {self.unique_id}: A* returned empty path from {from_node} to {to_node}")
                 return []

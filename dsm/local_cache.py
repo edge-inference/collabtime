@@ -8,6 +8,13 @@ Gossip protocol merges caches using Last-Write-Wins (LWW) semantics.
 from typing import Dict, Any, Optional
 import time
 
+try:
+    from perf.cache_merge_fast import merge_caches_fast
+    CYTHON_MERGE_AVAILABLE = True
+except ImportError:
+    CYTHON_MERGE_AVAILABLE = False
+    merge_caches_fast = None
+
 
 class LocalDSMCache:
     """
@@ -164,37 +171,38 @@ class LocalDSMCache:
         Merge another agent's cache into this one using LWW.
         This is the gossip merge operation.
         """
-        # --- MERGE FLOW TRACE ---
-        for node_id, other_entry in other.flow_trace.items():
-            my_entry = self.flow_trace.get(node_id, {'value': 0.0, 'timestamp': 0})
-            if other_entry['timestamp'] > my_entry['timestamp']:
-                self.flow_trace[node_id] = other_entry.copy()
+        if CYTHON_MERGE_AVAILABLE:
+            merge_caches_fast(self, other)
+        else:
+            # --- MERGE FLOW TRACE ---
+            for node_id, other_entry in other.flow_trace.items():
+                my_entry = self.flow_trace.get(node_id, {'value': 0.0, 'timestamp': 0})
+                if other_entry['timestamp'] > my_entry['timestamp']:
+                    self.flow_trace[node_id] = other_entry.copy()
 
-        # --- MERGE JAM SIGNAL ---
-        for node_id, other_entry in other.jam_signal.items():
-            my_entry = self.jam_signal.get(node_id, {'value': 0.0, 'timestamp': 0})
-            if other_entry['timestamp'] > my_entry['timestamp']:
-                self.jam_signal[node_id] = other_entry.copy()
+            # --- MERGE JAM SIGNAL ---
+            for node_id, other_entry in other.jam_signal.items():
+                my_entry = self.jam_signal.get(node_id, {'value': 0.0, 'timestamp': 0})
+                if other_entry['timestamp'] > my_entry['timestamp']:
+                    self.jam_signal[node_id] = other_entry.copy()
 
-        # --- MERGE AGENT LOCATIONS (CRITICAL FIX) ---
-        # The original implementation was flawed. This ensures all newer entries
-        # from the other cache are adopted, not just a simple LWW on the whole dictionary.
-        for agent_id, other_entry in other.agent_location.items():
-            my_entry = self.agent_location.get(agent_id, {'node': -1, 'timestamp': 0})
-            if other_entry['timestamp'] > my_entry['timestamp']:
-                self.agent_location[agent_id] = other_entry.copy()
-        
-        # --- MERGE PATH INTENT ---
-        for key, other_entry in other.path_intent.items():
-            my_entry = self.path_intent.get(key, {'timestamp': 0})
-            if other_entry.get('timestamp', 0) > my_entry.get('timestamp', 0):
-                self.path_intent[key] = other_entry.copy()
-        
-        # --- MERGE RESOURCE STATE ---
-        for resource_id, other_entry in other.resource_state.items():
-            my_entry = self.resource_state.get(resource_id, {'timestamp': 0})
-            if other_entry.get('timestamp', 0) > my_entry.get('timestamp', 0):
-                self.resource_state[resource_id] = other_entry.copy()
+            # --- MERGE AGENT LOCATIONS (CRITICAL FIX) ---
+            for agent_id, other_entry in other.agent_location.items():
+                my_entry = self.agent_location.get(agent_id, {'node': -1, 'timestamp': 0})
+                if other_entry['timestamp'] > my_entry['timestamp']:
+                    self.agent_location[agent_id] = other_entry.copy()
+            
+            # --- MERGE PATH INTENT ---
+            for key, other_entry in other.path_intent.items():
+                my_entry = self.path_intent.get(key, {'timestamp': 0})
+                if other_entry.get('timestamp', 0) > my_entry.get('timestamp', 0):
+                    self.path_intent[key] = other_entry.copy()
+            
+            # --- MERGE RESOURCE STATE ---
+            for resource_id, other_entry in other.resource_state.items():
+                my_entry = self.resource_state.get(resource_id, {'timestamp': 0})
+                if other_entry.get('timestamp', 0) > my_entry.get('timestamp', 0):
+                    self.resource_state[resource_id] = other_entry.copy()
     
     def get_stats(self) -> Dict[str, int]:
         """Get cache statistics"""

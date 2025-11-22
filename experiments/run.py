@@ -219,6 +219,10 @@ class ExperimentRunner:
                 step_duration_s=step_dt,
                 aoi_threshold_ms=aoi_threshold,
                 mode=sim_mode,
+                use_spatial_hash=config['simulation'].get('use_spatial_hash', False),
+                parallel_gossip=config['simulation'].get('parallel_gossip', False),
+                gossip_workers=config['simulation'].get('gossip_workers', 4),
+                use_cython=config['simulation'].get('use_cython', True),
                 seed=seed,
                 logger=self.logger
             )

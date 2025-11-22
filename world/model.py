@@ -40,6 +40,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from coord import Coordinator
 from config import LOG_INTERVAL_STEPS, TASK_SPAWN_LOG_INTERVAL_STEPS
 
+try:
+    from perf import SpatialHash, ParallelGossipEngine, CYTHON_AVAILABLE
+    PERF_MODULE_AVAILABLE = True
+except ImportError:
+    PERF_MODULE_AVAILABLE = False
+    SpatialHash = None
+    ParallelGossipEngine = None
+    CYTHON_AVAILABLE = False
+
 
 class WarehouseDSMModel(Model):
     """Mesa model for warehouse DSM simulation"""
@@ -58,6 +67,10 @@ class WarehouseDSMModel(Model):
                  step_duration_s: float = 0.05,
                  aoi_threshold_ms: int = 1000,
                  mode: str = 'p2p',
+                 use_spatial_hash: bool = False,
+                 parallel_gossip: bool = False,
+                 gossip_workers: int = 4,
+                 use_cython: bool = True,
                  logger=None):
         
         super().__init__(seed=seed)
@@ -105,6 +118,28 @@ class WarehouseDSMModel(Model):
             )
             if self.logger:
                 self.logger.info("Initialized CENTRALIZED mode with central path scheduler (bottleneck)")
+        
+        # Performance optimizations
+        self.use_cython = use_cython and PERF_MODULE_AVAILABLE and CYTHON_AVAILABLE
+        self.spatial_hash = None
+        if use_spatial_hash and PERF_MODULE_AVAILABLE:
+            self.spatial_hash = SpatialHash(
+                width=self.warehouse.width,
+                height=self.warehouse.height,
+                cell_size=5
+            )
+            if self.logger:
+                self.logger.info(f"Spatial hash ENABLED (cell_size=5, grid={self.spatial_hash.grid_width}x{self.spatial_hash.grid_height})")
+        
+        self.gossip_engine = None
+        if parallel_gossip and PERF_MODULE_AVAILABLE and self.mode != 'centralized':
+            self.gossip_engine = ParallelGossipEngine(num_workers=gossip_workers)
+            self.gossip_engine.start()
+            if self.logger:
+                self.logger.info(f"Parallel gossip ENABLED (workers={gossip_workers})")
+        
+        if self.use_cython and self.logger:
+            self.logger.info("Cython-accelerated hot paths ENABLED (A* + cache merging)")
         
         # Agent scheduler
         self.schedule = RandomActivation(self)
@@ -273,15 +308,18 @@ class WarehouseDSMModel(Model):
         if len(agents) < 2:
             return
         
-        self.random.shuffle(agents)
-        
-        for i in range(0, len(agents) - 1, 2):
-            agent_a = agents[i]
-            agent_b = agents[i + 1]
+        if self.gossip_engine:
+            self.gossip_engine.gossip_round(agents)
+        else:
+            self.random.shuffle(agents)
             
-            if hasattr(agent_a, 'local_cache') and hasattr(agent_b, 'local_cache'):
-                agent_a.local_cache.merge_from(agent_b.local_cache)
-                agent_b.local_cache.merge_from(agent_a.local_cache)
+            for i in range(0, len(agents) - 1, 2):
+                agent_a = agents[i]
+                agent_b = agents[i + 1]
+                
+                if hasattr(agent_a, 'local_cache') and hasattr(agent_b, 'local_cache'):
+                    agent_a.local_cache.merge_from(agent_b.local_cache)
+                    agent_b.local_cache.merge_from(agent_a.local_cache)
     
     def try_reserve_edge(self, from_node: int, to_node: int, duration_steps: int) -> bool:
         """Reserve an edge lane, allowing multi-agent traversal up to aisle width.
