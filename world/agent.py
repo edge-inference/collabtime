@@ -46,9 +46,8 @@ class RobotAgent(mesa.Agent):
     """A robotic agent operating in the warehouse"""
     
     def __init__(self, unique_id: int, model, initial_node: int):
-        # Manually set mesa.Agent attributes instead of calling super().__init__()
+        super().__init__(model)
         self.unique_id = unique_id
-        self.model = model
         
         # Physical state
         self.node = initial_node
