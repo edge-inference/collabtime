@@ -13,7 +13,8 @@ def compute_edge_cost(
     base_cost: float = 1.0,
     alpha: float = 2.0,
     beta: float = 0.5,
-    max_aoi_ms: int = 5000
+    max_aoi_ms: int = 5000,
+    current_time_ms: int = 0
 ) -> float:
     """
     Compute dynamic edge cost using DSM congestion signals.
@@ -38,8 +39,8 @@ def compute_edge_cost(
     
     try:
         if hasattr(dsm_api, 'read_jam'):
-            jam_value = dsm_api.read_jam(to_node, max_aoi_ms)
-            flow_value = dsm_api.read_flow(to_node, max_aoi_ms)
+            jam_value = dsm_api.read_jam(to_node, max_aoi_ms, current_time_ms)
+            flow_value = dsm_api.read_flow(to_node, max_aoi_ms, current_time_ms)
         else:
             jam_result = dsm_api.read_window('jam_signal', to_node, radius=0, max_aoi_ms=max_aoi_ms)
             jam_value = jam_result.get('peak_value', 0.0)

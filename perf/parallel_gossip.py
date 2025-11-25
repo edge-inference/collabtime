@@ -23,10 +23,10 @@ def _worker_init(shm_metadata: Dict[str, Any]):
         
         # Attach to all blocks
         blocks = {
-            'jam': (jam_shape, np.float32, np.int64),
-            'flow': (jam_shape, np.float32, np.int64),
-            'loc': (loc_shape, np.int32, np.int64),
-            'path': (path_shape, np.int32, np.int64)
+            'jam': (jam_shape, np.float32, np.int32),
+            'flow': (jam_shape, np.float32, np.int32),
+            'loc': (loc_shape, np.int32, np.int32),
+            'path': (path_shape, np.int32, np.int32)
         }
         
         for key, (shape, val_dtype, ts_dtype) in blocks.items():

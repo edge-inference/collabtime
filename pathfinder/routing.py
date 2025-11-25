@@ -33,7 +33,9 @@ def astar_with_congestion(
     
     # Use default params if none provided
     if cost_params is None:
-        cost_params = {'alpha': 2.0, 'beta': 0.5, 'max_aoi_ms': 5000}
+        cost_params = {'alpha': 2.0, 'beta': 0.5, 'max_aoi_ms': 5000, 'current_time_ms': 0}
+    
+    current_time_ms = cost_params.get('current_time_ms', 0)
     
     # A* data structures
     open_set = []
@@ -55,7 +57,8 @@ def astar_with_congestion(
                 base_cost=1.0,
                 alpha=cost_params.get('alpha', 2.0),
                 beta=cost_params.get('beta', 0.5),
-                max_aoi_ms=cost_params.get('max_aoi_ms', 5000)
+                max_aoi_ms=cost_params.get('max_aoi_ms', 5000),
+                current_time_ms=current_time_ms
             )
             
             tentative_g = g_score.get(current, float('inf')) + edge_cost

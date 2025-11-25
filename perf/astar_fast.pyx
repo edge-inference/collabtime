@@ -20,13 +20,13 @@ cdef struct ConflictIndex:
 
 cdef ConflictIndex* _build_conflict_index(
     int[:,:] path_vals,
-    long[:] path_timestamps,
+    int[:] path_timestamps,
     int num_nodes,
     float[:,:] coords,
     int start,
     int goal,
     float proximity_radius,
-    long current_time_ms,
+    int current_time_ms,
     int max_aoi_ms
 ) nogil:
     cdef ConflictIndex* idx = <ConflictIndex*>malloc(sizeof(ConflictIndex))
@@ -82,15 +82,15 @@ cpdef list astar_fast(
     int[:] indices, 
     float[:,:] coords, 
     float[:] jam_values, 
-    long[:] jam_timestamps,
+    int[:] jam_timestamps,
     float[:] flow_values, 
-    long[:] flow_timestamps,
+    int[:] flow_timestamps,
     int[:,:] path_vals,
-    long[:] path_timestamps,
+    int[:] path_timestamps,
     int start, 
     int goal, 
     dict cost_params,
-    long current_time_ms
+    int current_time_ms
 ):
     if start == goal:
         return [start]
@@ -160,15 +160,15 @@ cdef inline float _heuristic_fast(float[:,:] coords, int node, int goal):
 
 cdef inline float _compute_edge_cost_fast(
     float[:] jam_values, 
-    long[:] jam_timestamps,
+    int[:] jam_timestamps,
     float[:] flow_values, 
-    long[:] flow_timestamps,
+    int[:] flow_timestamps,
     ConflictIndex* conflict_idx,
     int to_node,
     float alpha, 
     float beta, 
     int max_aoi_ms,
-    long current_time_ms,
+    int current_time_ms,
     float conflict_penalty
 ) nogil:
     cdef float cost = 1.0

@@ -51,9 +51,9 @@ class LocalDSMCache:
                     shape = shm_metadata['shape_jam'] # (num_agents, num_nodes)
                     
                     all_jam_vals = np.ndarray(shape, dtype=np.float32, buffer=shm_jam_vals.buf)
-                    all_jam_ts = np.ndarray(shape, dtype=np.int64, buffer=shm_jam_ts.buf)
+                    all_jam_ts = np.ndarray(shape, dtype=np.int32, buffer=shm_jam_ts.buf)
                     all_flow_vals = np.ndarray(shape, dtype=np.float32, buffer=shm_flow_vals.buf)
-                    all_flow_ts = np.ndarray(shape, dtype=np.int64, buffer=shm_flow_ts.buf)
+                    all_flow_ts = np.ndarray(shape, dtype=np.int32, buffer=shm_flow_ts.buf)
                     
                     # Slice ONLY this agent's row
                     self.jam_values = all_jam_vals[agent_id]
@@ -67,7 +67,7 @@ class LocalDSMCache:
                     self._shm_refs.extend([shm_loc_vals, shm_loc_ts])
                     
                     all_loc_vals = np.ndarray(shm_metadata['shape_loc'], dtype=np.int32, buffer=shm_loc_vals.buf)
-                    all_loc_ts = np.ndarray(shm_metadata['shape_loc'], dtype=np.int64, buffer=shm_loc_ts.buf)
+                    all_loc_ts = np.ndarray(shm_metadata['shape_loc'], dtype=np.int32, buffer=shm_loc_ts.buf)
                     
                     self.loc_vals = all_loc_vals[agent_id]
                     self.loc_timestamps = all_loc_ts[agent_id]
@@ -78,7 +78,7 @@ class LocalDSMCache:
                     self._shm_refs.extend([shm_path_vals, shm_path_ts])
                     
                     all_path_vals = np.ndarray(shm_metadata['shape_path'], dtype=np.int32, buffer=shm_path_vals.buf)
-                    all_path_ts = np.ndarray(shm_metadata['shape_loc'], dtype=np.int64, buffer=shm_path_ts.buf) # TS is (AxA)
+                    all_path_ts = np.ndarray(shm_metadata['shape_loc'], dtype=np.int32, buffer=shm_path_ts.buf) # TS is (AxA)
                     
                     self.path_vals = all_path_vals[agent_id]
                     self.path_timestamps = all_path_ts[agent_id]
@@ -92,9 +92,9 @@ class LocalDSMCache:
             else:
                 # Local Array Mode (Fallback) - partial
                 self.jam_values = np.zeros(num_nodes, dtype=np.float32)
-                self.jam_timestamps = np.zeros(num_nodes, dtype=np.int64)
+                self.jam_timestamps = np.zeros(num_nodes, dtype=np.int32)
                 self.flow_values = np.zeros(num_nodes, dtype=np.float32)
-                self.flow_timestamps = np.zeros(num_nodes, dtype=np.int64)
+                self.flow_timestamps = np.zeros(num_nodes, dtype=np.int32)
 
     def __getstate__(self):
         """Custom pickle state to exclude SHM/Arrays and huge dicts"""
@@ -150,9 +150,11 @@ class LocalDSMCache:
         
         raise RuntimeError("SHM arrays required")
     
-    def read_flow(self, node_id: int, max_aoi_ms: int) -> float:
+    def read_flow(self, node_id: int, max_aoi_ms: int, current_time_ms: int = None) -> float:
         """Read flow trace at node (with AoI filtering)"""
-        current_time = int(time.time() * 1000)
+        if current_time_ms is None:
+            current_time_ms = int(time.time() * 1000)
+        current_time = current_time_ms
         
         if self.use_fast_arrays and self.shm_metadata:
             try:
@@ -164,9 +166,11 @@ class LocalDSMCache:
         
         raise RuntimeError("SHM arrays required")
     
-    def read_jam(self, node_id: int, max_aoi_ms: int) -> float:
+    def read_jam(self, node_id: int, max_aoi_ms: int, current_time_ms: int = None) -> float:
         """Read jam signal at node (with AoI filtering)"""
-        current_time = int(time.time() * 1000)
+        if current_time_ms is None:
+            current_time_ms = int(time.time() * 1000)
+        current_time = current_time_ms
         
         if self.use_fast_arrays and self.shm_metadata:
             try:
@@ -189,9 +193,11 @@ class LocalDSMCache:
         
         raise RuntimeError("SHM arrays required")
     
-    def read_agents_at_node(self, node_id: int, max_aoi_ms: int) -> int:
+    def read_agents_at_node(self, node_id: int, max_aoi_ms: int, current_time_ms: int = None) -> int:
         """Count agents at a node based on cached locations (with AoI filtering)"""
-        current_time = int(time.time() * 1000)
+        if current_time_ms is None:
+            current_time_ms = int(time.time() * 1000)
+        current_time = current_time_ms
         
         if self.use_fast_arrays and self.shm_metadata:
             # Vectorized count
@@ -289,11 +295,13 @@ class LocalDSMCache:
                 self.resource_state[resource_id] = other_entry.copy()
 
     
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self, current_time_ms: int = None) -> Dict[str, int]:
         """Get cache statistics - counts actual entries in use"""
         if self.use_fast_arrays and self.shm_metadata:
             # Count non-zero/fresh entries in SHM arrays
-            current_time = int(time.time() * 1000)
+            if current_time_ms is None:
+                current_time_ms = int(time.time() * 1000)
+            current_time = current_time_ms
             max_aoi = 10000  # 10 seconds
             
             # Count fresh jam entries (per node)
@@ -322,9 +330,11 @@ class LocalDSMCache:
             return float(np.sum(self.jam_values))
         raise RuntimeError("SHM arrays required")
     
-    def cleanup_stale_entries(self, max_age_ms: int):
+    def cleanup_stale_entries(self, max_age_ms: int, current_time_ms: int = None):
         """Remove cache entries older than max_age_ms to prevent unbounded growth"""
-        current_time = int(time.time() * 1000)
+        if current_time_ms is None:
+            current_time_ms = int(time.time() * 1000)
+        current_time = current_time_ms
         
         if self.use_fast_arrays and self.shm_metadata:
             # SHM arrays don't need cleanup - timestamps naturally filter stale data

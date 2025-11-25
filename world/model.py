@@ -164,65 +164,93 @@ class WarehouseDSMModel(Model):
         self.shm_objects = []
         self.shm_metadata = {}
         if self.mode != 'centralized':
+            def _allocate_shm_with_retry(name: str, size: int, max_retries: int = 3):
+                """Allocate shared memory with retry and GC between attempts"""
+                import gc
+                import time
+                for attempt in range(max_retries):
+                    try:
+                        shm = shared_memory.SharedMemory(create=True, size=size)
+                        return shm
+                    except OSError as e:
+                        if attempt < max_retries - 1:
+                            if self.logger:
+                                self.logger.warning(f"Shared memory allocation attempt {attempt+1}/{max_retries} failed for {name} "
+                                                  f"({size/1024**2:.1f} MB): {e}. Retrying after GC...")
+                            gc.collect()
+                            time.sleep(0.1)
+                        else:
+                            raise
+                return None
+            
             try:
+                # Pre-cleanup any potentially lingering shared memory objects
+                import gc
+                gc.collect()
+                
                 num_nodes = self.warehouse.graph.number_of_nodes()
                 
-                # 1. Jam Values (Agents x Nodes, float32)
+                # Calculate total memory requirement
                 jam_size = self.num_agents * num_nodes * 4
-                self.shm_jam_vals = shared_memory.SharedMemory(create=True, size=jam_size)
+                jam_ts_size = self.num_agents * num_nodes * 4
+                flow_size = self.num_agents * num_nodes * 4
+                flow_ts_size = self.num_agents * num_nodes * 4
+                loc_size = self.num_agents * self.num_agents * 4
+                loc_ts_size = self.num_agents * self.num_agents * 4
+                path_size = self.num_agents * self.num_agents * 50 * 4
+                path_ts_size = self.num_agents * self.num_agents * 4
+                total_size = jam_size + jam_ts_size + flow_size + flow_ts_size + loc_size + loc_ts_size + path_size + path_ts_size
+                
+                if self.logger:
+                    self.logger.info(f"Attempting Shared Memory allocation: {total_size/1024**2:.1f} MB "
+                                   f"({self.num_agents} agents, {num_nodes} nodes, 8 segments)")
+                
+                # 1. Jam Values (Agents x Nodes, float32)
+                self.shm_jam_vals = _allocate_shm_with_retry("jam_vals", jam_size)
                 self.shm_objects.append(self.shm_jam_vals)
                 
-                # 2. Jam Timestamps (Agents x Nodes, int64)
-                jam_ts_size = self.num_agents * num_nodes * 8
-                self.shm_jam_ts = shared_memory.SharedMemory(create=True, size=jam_ts_size)
+                # 2. Jam Timestamps (Agents x Nodes, int32)
+                self.shm_jam_ts = _allocate_shm_with_retry("jam_ts", jam_ts_size)
                 self.shm_objects.append(self.shm_jam_ts)
                 
                 # 3. Flow Values (Agents x Nodes, float32)
-                flow_size = self.num_agents * num_nodes * 4
-                self.shm_flow_vals = shared_memory.SharedMemory(create=True, size=flow_size)
+                self.shm_flow_vals = _allocate_shm_with_retry("flow_vals", flow_size)
                 self.shm_objects.append(self.shm_flow_vals)
                 
-                # 4. Flow Timestamps (Agents x Nodes, int64)
-                flow_ts_size = self.num_agents * num_nodes * 8
-                self.shm_flow_ts = shared_memory.SharedMemory(create=True, size=flow_ts_size)
+                # 4. Flow Timestamps (Agents x Nodes, int32)
+                self.shm_flow_ts = _allocate_shm_with_retry("flow_ts", flow_ts_size)
                 self.shm_objects.append(self.shm_flow_ts)
                 
                 # 5. Agent Locations (Agents x Agents, int32) - Belief matrix
-                # loc[i, j] = Agent i's belief of Agent j's location
-                loc_size = self.num_agents * self.num_agents * 4
-                self.shm_loc_vals = shared_memory.SharedMemory(create=True, size=loc_size)
+                self.shm_loc_vals = _allocate_shm_with_retry("loc_vals", loc_size)
                 self.shm_objects.append(self.shm_loc_vals)
                 
-                # 6. Agent Location Timestamps (Agents x Agents, int64)
-                loc_ts_size = self.num_agents * self.num_agents * 8
-                self.shm_loc_ts = shared_memory.SharedMemory(create=True, size=loc_ts_size)
+                # 6. Agent Location Timestamps (Agents x Agents, int32)
+                self.shm_loc_ts = _allocate_shm_with_retry("loc_ts", loc_ts_size)
                 self.shm_objects.append(self.shm_loc_ts)
                 
                 # 7. Path Intents (Agents x Agents x PathLen, int32) - Belief tensor
-                # paths[i, j, k] = Agent i's belief of Agent j's location at step k
-                path_len = 50  # Fixed horizon
-                path_size = self.num_agents * self.num_agents * path_len * 4
-                self.shm_path_vals = shared_memory.SharedMemory(create=True, size=path_size)
+                path_len = 50
+                self.shm_path_vals = _allocate_shm_with_retry("path_vals", path_size)
                 self.shm_objects.append(self.shm_path_vals)
                 
-                # 8. Path Intent Timestamps (Agents x Agents, int64) - One TS per path
-                path_ts_size = self.num_agents * self.num_agents * 8
-                self.shm_path_ts = shared_memory.SharedMemory(create=True, size=path_ts_size)
+                # 8. Path Intent Timestamps (Agents x Agents, int32) - One TS per path
+                self.shm_path_ts = _allocate_shm_with_retry("path_ts", path_ts_size)
                 self.shm_objects.append(self.shm_path_ts)
 
                 # Initialize to zeros (and -1 for nodes)
                 np.ndarray((self.num_agents, num_nodes), dtype=np.float32, buffer=self.shm_jam_vals.buf).fill(0)
-                np.ndarray((self.num_agents, num_nodes), dtype=np.int64, buffer=self.shm_jam_ts.buf).fill(0)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.int32, buffer=self.shm_jam_ts.buf).fill(0)
                 np.ndarray((self.num_agents, num_nodes), dtype=np.float32, buffer=self.shm_flow_vals.buf).fill(0)
-                np.ndarray((self.num_agents, num_nodes), dtype=np.int64, buffer=self.shm_flow_ts.buf).fill(0)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.int32, buffer=self.shm_flow_ts.buf).fill(0)
                 
                 # Init locations to -1 (unknown)
                 np.ndarray((self.num_agents, self.num_agents), dtype=np.int32, buffer=self.shm_loc_vals.buf).fill(-1)
-                np.ndarray((self.num_agents, self.num_agents), dtype=np.int64, buffer=self.shm_loc_ts.buf).fill(0)
+                np.ndarray((self.num_agents, self.num_agents), dtype=np.int32, buffer=self.shm_loc_ts.buf).fill(0)
                 
                 # Init paths to -1
                 np.ndarray((self.num_agents, self.num_agents, path_len), dtype=np.int32, buffer=self.shm_path_vals.buf).fill(-1)
-                np.ndarray((self.num_agents, self.num_agents), dtype=np.int64, buffer=self.shm_path_ts.buf).fill(0)
+                np.ndarray((self.num_agents, self.num_agents), dtype=np.int32, buffer=self.shm_path_ts.buf).fill(0)
                 
                 self.shm_metadata = {
                     'jam_vals_name': self.shm_jam_vals.name,
@@ -398,9 +426,10 @@ class WarehouseDSMModel(Model):
         # Only in distributed mode (centralized has no agent caches)
         if self.mode != 'centralized' and self.step_count % 1000 == 0:
             max_age_ms = 100 * self.aoi_threshold_ms
+            current_time_ms_cleanup = int(self.step_count * self.step_duration_s * 1000)
             for agent in self.schedule.agents:
                 if agent.local_cache:
-                    agent.local_cache.cleanup_stale_entries(max_age_ms)
+                    agent.local_cache.cleanup_stale_entries(max_age_ms, current_time_ms_cleanup)
             self.logger.info(f"Step {self.step_count}: Cleaned up cache entries older than {max_age_ms}ms (100x AoI)")
         
         # Collect data

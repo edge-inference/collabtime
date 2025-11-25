@@ -10,8 +10,9 @@ from world.model import WarehouseDSMModel
 
 def collect_step_metrics(model: WarehouseDSMModel, step: int) -> Dict:
     """Collect metrics for a single simulation step."""
+    current_time_ms = int(model.step_count * model.step_duration_s * 1000)
     cache_stats_per_agent = [
-        agent.local_cache.get_stats() if agent.local_cache else {}
+        agent.local_cache.get_stats(current_time_ms) if agent.local_cache else {}
         for agent in model.schedule.agents
     ]
     
@@ -124,8 +125,9 @@ def collect_final_metrics(model: WarehouseDSMModel, step_data: List[Dict], sim_d
         avg_cache_size = model.central_scheduler.metrics['congestion_data_size'] if model.central_scheduler else 0
         total_gossip_rounds = 0
     else:
+        current_time_ms = int(model.step_count * model.step_duration_s * 1000)
         avg_cache_size = np.mean([
-            sum(agent.local_cache.get_stats().values()) if agent.local_cache else 0
+            sum(agent.local_cache.get_stats(current_time_ms).values()) if agent.local_cache else 0
             for agent in model.schedule.agents
         ])
         total_gossip_rounds = df['gossip_rounds'].max() if 'gossip_rounds' in df else 0

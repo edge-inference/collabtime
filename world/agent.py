@@ -104,7 +104,7 @@ class RobotAgent(mesa.Agent):
         # Write own location to local cache (for others to see via gossip)
         # Only in distributed mode
         if self.local_cache:
-            current_time_ms = int(time.time() * 1000)
+            current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
             self.local_cache.write_agent_location(self.unique_id, self.node, current_time_ms)
         
         # Decrement cooldowns for failed tasks
@@ -428,7 +428,8 @@ class RobotAgent(mesa.Agent):
             return capacity > 0
         
         # Distributed: check capacity using cached agent locations (may be stale!)
-        agents_at_node = self.local_cache.read_agents_at_node(node, max_aoi_ms=MAX_AOI_MS)
+        current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
+        agents_at_node = self.local_cache.read_agents_at_node(node, max_aoi_ms=MAX_AOI_MS, current_time_ms=current_time_ms)
         capacity = self.model.warehouse.get_node_capacity(node)
         return agents_at_node < capacity
     
@@ -482,15 +483,16 @@ class RobotAgent(mesa.Agent):
         Uses local cache with gossip - eventual consistency.
         """
         try:
+            current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
+            
             cost_params = {
                 'alpha': 2.0,
                 'beta': 0.5,
                 'max_aoi_ms': MAX_AOI_MS,
                 'proximity_radius': 25.0,
-                'conflict_penalty': 100.0
+                'conflict_penalty': 100.0,
+                'current_time_ms': current_time_ms
             }
-            
-            current_time_ms = int(time.time() * 1000)
             
             if CYTHON_ASTAR_AVAILABLE and self.model.use_cython and self.model.graph_csr is not None:
                 # Unpack CSR arrays
@@ -589,7 +591,7 @@ class RobotAgent(mesa.Agent):
         elif self.local_cache:
             # Distributed: write to local cache (eventual consistency via gossip)
             try:
-                current_time_ms = int(time.time() * 1000)
+                current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
                 self.local_cache.write_flow(to_node, 1.0, current_time_ms)
             except Exception:
                 pass
@@ -607,7 +609,7 @@ class RobotAgent(mesa.Agent):
         elif self.local_cache:
             # Distributed: write to local cache (eventual consistency via gossip)
             try:
-                current_time_ms = int(time.time() * 1000)
+                current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
                 self.local_cache.write_jam(self.node, jam_value, current_time_ms)
             except Exception:
                 pass
