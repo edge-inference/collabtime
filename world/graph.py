@@ -9,6 +9,7 @@ import networkx as nx
 from typing import Dict, List, Tuple, Set, Optional
 import random
 import sys
+import numpy as np
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -322,6 +323,44 @@ class WarehouseGraph:
             node_data = self.graph.nodes[node]
             return (node_data['x'], node_data['y'])
         return (0, 0)
+    
+    def get_node_coords_array(self) -> np.ndarray:
+        """Get (N, 2) float32 array of node coordinates for fast A*"""
+        num_nodes = self.graph.number_of_nodes()
+        # Assuming nodes are 0..N-1. If not, we map them.
+        # Our construction logic uses y * width + x, which fills 0..N-1 exactly.
+        coords = np.zeros((num_nodes, 2), dtype=np.float32)
+        for node in self.graph.nodes:
+            if node < num_nodes:
+                x, y = self.get_node_position(node)
+                coords[node, 0] = x
+                coords[node, 1] = y
+        return coords
+
+    def get_csr_graph(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get CSR representation (indptr, indices, data) for fast C-level iteration"""
+        try:
+            # Use scipy if available
+            import scipy.sparse
+            adj = nx.to_scipy_sparse_array(self.graph, format='csr', weight='weight')
+            return (adj.indptr.astype(np.int32), 
+                    adj.indices.astype(np.int32), 
+                    adj.data.astype(np.float32))
+        except ImportError:
+            # Fallback manual construction
+            num_nodes = self.graph.number_of_nodes()
+            indptr = [0]
+            indices = []
+            data = []
+            for i in range(num_nodes):
+                neighbors = list(self.graph.neighbors(i))
+                indices.extend(neighbors)
+                # All weights are 1.0
+                data.extend([1.0] * len(neighbors))
+                indptr.append(len(indices))
+            return (np.array(indptr, dtype=np.int32), 
+                    np.array(indices, dtype=np.int32), 
+                    np.array(data, dtype=np.float32))
     
     def visualize(self, agent_positions: Dict[int, int] = None, 
                  task_locations: List[int] = None):

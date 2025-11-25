@@ -89,3 +89,7 @@ pnpm-debug.log*
 *.sqlite
 *.db
 notes/myls_template/__MACOSX/
+
+backup/
+.cursor/
+.cursorrules

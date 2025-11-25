@@ -45,7 +45,7 @@ class AgentState(Enum):
 class RobotAgent(mesa.Agent):
     """A robotic agent operating in the warehouse"""
     
-    def __init__(self, unique_id: int, model, initial_node: int):
+    def __init__(self, unique_id: int, model, initial_node: int, shm_metadata: Dict[str, Any] = None):
         super().__init__(model)
         self.unique_id = unique_id
         
@@ -72,7 +72,13 @@ class RobotAgent(mesa.Agent):
         self.failed_task_cooldown_duration = 300 
         
         # Peer-to-peer DSM: local cache (only in distributed mode)
-        self.local_cache = LocalDSMCache(unique_id) if model.mode != 'centralized' else None
+        if model.mode != 'centralized':
+            num_nodes = 0
+            if hasattr(model, 'warehouse') and hasattr(model.warehouse, 'graph'):
+                num_nodes = model.warehouse.graph.number_of_nodes()
+            self.local_cache = LocalDSMCache(unique_id, num_nodes=num_nodes, shm_metadata=shm_metadata)
+        else:
+            self.local_cache = None
         
         # Performance tracking
         self.metrics = {
@@ -476,15 +482,35 @@ class RobotAgent(mesa.Agent):
         Uses local cache with gossip - eventual consistency.
         """
         try:
-            cost_params = {'alpha': 2.0, 'beta': 0.5, 'max_aoi_ms': MAX_AOI_MS}
+            cost_params = {
+                'alpha': 2.0,
+                'beta': 0.5,
+                'max_aoi_ms': MAX_AOI_MS,
+                'proximity_radius': 25.0,
+                'conflict_penalty': 100.0
+            }
             
-            if CYTHON_ASTAR_AVAILABLE and self.model.use_cython:
+            current_time_ms = int(time.time() * 1000)
+            
+            if CYTHON_ASTAR_AVAILABLE and self.model.use_cython and self.model.graph_csr is not None:
+                # Unpack CSR arrays
+                indptr, indices, _ = self.model.graph_csr
+                
+                # Fast C-level A*
                 path = astar_fast(
-                    warehouse=self.model.warehouse,
-                    dsm_api=self.local_cache,
+                    indptr=indptr,
+                    indices=indices,
+                    coords=self.model.node_coords,
+                    jam_values=self.local_cache.jam_values,
+                    jam_timestamps=self.local_cache.jam_timestamps,
+                    flow_values=self.local_cache.flow_values,
+                    flow_timestamps=self.local_cache.flow_timestamps,
+                    path_vals=self.local_cache.path_vals,
+                    path_timestamps=self.local_cache.path_timestamps,
                     start=from_node,
                     goal=to_node,
-                    cost_params=cost_params
+                    cost_params=cost_params,
+                    current_time_ms=current_time_ms
                 )
             else:
                 path = astar_with_congestion(
@@ -495,18 +521,17 @@ class RobotAgent(mesa.Agent):
                     cost_params=cost_params
                 )
             if not path:
-                self.model.logger.error(f"Agent {self.unique_id}: A* returned empty path from {from_node} to {to_node}")
+                # self.model.logger.error(f"Agent {self.unique_id}: A* returned empty path from {from_node} to {to_node}")
                 return []
             
-            current_time_ms = int(time.time() * 1000)
             estimated_time_per_step = int(self.model.step_duration_s * MOVEMENT_DURATION_STEPS * 1000)
             
-            for i, node in enumerate(path):
-                arrival_time = current_time_ms + (i * estimated_time_per_step)
-                self.local_cache.write_path_intent(
+            # Write full path intent (Optimized Batch Write)
+            if self.local_cache:
+                self.local_cache.write_path_intent_batch(
                     agent_id=self.unique_id,
-                    node_id=node,
-                    arrival_time_ms=arrival_time,
+                    path=path,
+                    start_time_ms=current_time_ms,
                     duration_ms=estimated_time_per_step,
                     timestamp_ms=current_time_ms
                 )

@@ -15,11 +15,6 @@ extensions = [
         ["perf/astar_fast.pyx"],
         include_dirs=[np.get_include()],
     ),
-    Extension(
-        "perf.cache_merge_fast",
-        ["perf/cache_merge_fast.pyx"],
-        include_dirs=[np.get_include()],
-    ),
 ]
 
 setup(

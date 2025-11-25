@@ -1,0 +1,309 @@
+# Large Scale Experiments (600-1000 agents)
+# Finding the crossover point where distributed overtakes centralized
+
+experiments:
+  scalability_600_agents:
+    name: "Scalability: 600 Agents"
+    description: "Large scale test with 600 agents to test coordination overhead"
+    warehouse:
+      size: [105, 85]
+      storage_regions:
+        - {center: [26, 21], radius: 17}
+        - {center: [79, 64], radius: 17}
+      sortation_regions:
+        - {center: [52, 11], radius: 8}
+        - {center: [52, 74], radius: 8}
+    agents:
+      count: 600
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 5.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 28
+      use_cython: true
+
+  centralized_600_agents:
+    name: "Centralized: 600 Agents"
+    description: "Centralized baseline with 600 agents to test scheduler saturation"
+    warehouse:
+      size: [105, 85]
+      storage_regions:
+        - {center: [26, 21], radius: 17}
+        - {center: [79, 64], radius: 17}
+      sortation_regions:
+        - {center: [52, 11], radius: 8}
+        - {center: [52, 74], radius: 8}
+    agents:
+      count: 600
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 5.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+  scalability_700_agents:
+    name: "Scalability: 700 Agents"
+    description: "Large scale test with 700 agents"
+    warehouse:
+      size: [110, 90]
+      storage_regions:
+        - {center: [28, 23], radius: 18}
+        - {center: [82, 67], radius: 18}
+      sortation_regions:
+        - {center: [55, 12], radius: 8}
+        - {center: [55, 78], radius: 8}
+    agents:
+      count: 700
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 6.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 32
+      use_cython: true
+
+  centralized_700_agents:
+    name: "Centralized: 700 Agents"
+    description: "Centralized baseline with 700 agents"
+    warehouse:
+      size: [110, 90]
+      storage_regions:
+        - {center: [28, 23], radius: 18}
+        - {center: [82, 67], radius: 18}
+      sortation_regions:
+        - {center: [55, 12], radius: 8}
+        - {center: [55, 78], radius: 8}
+    agents:
+      count: 700
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 6.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+  scalability_800_agents:
+    name: "Scalability: 800 Agents"
+    description: "Large scale test with 800 agents"
+    warehouse:
+      size: [115, 95]
+      storage_regions:
+        - {center: [29, 24], radius: 19}
+        - {center: [86, 71], radius: 19}
+      sortation_regions:
+        - {center: [57, 12], radius: 9}
+        - {center: [57, 83], radius: 9}
+    agents:
+      count: 800
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 6.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 36
+      use_cython: true
+
+  centralized_800_agents:
+    name: "Centralized: 800 Agents"
+    description: "Centralized baseline with 800 agents"
+    warehouse:
+      size: [115, 95]
+      storage_regions:
+        - {center: [29, 24], radius: 19}
+        - {center: [86, 71], radius: 19}
+      sortation_regions:
+        - {center: [57, 12], radius: 9}
+        - {center: [57, 83], radius: 9}
+    agents:
+      count: 800
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 6.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+  scalability_900_agents:
+    name: "Scalability: 900 Agents"
+    description: "Large scale test with 900 agents"
+    warehouse:
+      size: [118, 98]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [88, 73], radius: 20}
+      sortation_regions:
+        - {center: [59, 12], radius: 9}
+        - {center: [59, 86], radius: 9}
+    agents:
+      count: 900
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 7.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 40
+      use_cython: true
+
+  centralized_900_agents:
+    name: "Centralized: 900 Agents"
+    description: "Centralized baseline with 900 agents"
+    warehouse:
+      size: [118, 98]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [88, 73], radius: 20}
+      sortation_regions:
+        - {center: [59, 12], radius: 9}
+        - {center: [59, 86], radius: 9}
+    agents:
+      count: 900
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 7.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+  scalability_1000_agents:
+    name: "Scalability: 1000 Agents"
+    description: "Extreme scale test with 1000 agents"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents:
+      count: 1000
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 7.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 48
+      use_cython: true
+
+  centralized_1000_agents:
+    name: "Centralized: 1000 Agents"
+    description: "Extreme scale centralized test with 1000 agents"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents:
+      count: 1000
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 4
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 7.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+

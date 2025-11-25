@@ -8,6 +8,8 @@ Handles task generation, data collection, and simulation orchestration.
 import mesa
 from mesa import Model
 from mesa.datacollection import DataCollector
+from multiprocessing import shared_memory
+import numpy as np
 import importlib
 try:
     RandomActivation = importlib.import_module("mesa.time").RandomActivation
@@ -40,14 +42,18 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from coord import Coordinator
 from config import LOG_INTERVAL_STEPS, TASK_SPAWN_LOG_INTERVAL_STEPS
 
+# Performance Optimizations (Mandatory - Fail Fast)
 try:
-    from perf import SpatialHash, ParallelGossipEngine, CYTHON_AVAILABLE
-    PERF_MODULE_AVAILABLE = True
+    from perf import SpatialHash, ParallelGossipEngine
+except ImportError as e:
+    raise RuntimeError(f"CRITICAL: Performance modules (Cython/SharedMemory) missing. Simulation cannot run at scale. {e}")
+
+# Check Cython availability directly
+try:
+    from perf.astar_fast import astar_fast
+    CYTHON_AVAILABLE = True
 except ImportError:
-    PERF_MODULE_AVAILABLE = False
-    SpatialHash = None
-    ParallelGossipEngine = None
-    CYTHON_AVAILABLE = False
+    raise RuntimeError("CRITICAL: Cython extension 'astar_fast' not compiled. Run 'python3 perf/setup_cython.py build_ext --inplace'.")
 
 
 class WarehouseDSMModel(Model):
@@ -107,22 +113,11 @@ class WarehouseDSMModel(Model):
         # Coordinator (control plane): strong consistency for tasks
         self.coordinator = coordinator if coordinator is not None else Coordinator()
         
-        # Central scheduler (centralized mode only)
-        self.central_scheduler = None
-        if self.mode == 'centralized':
-            from central.scheduler import CentralizedScheduler
-            self.central_scheduler = CentralizedScheduler(
-                warehouse_graph=self.warehouse,
-                coordinator=self.coordinator,
-                logger=self.logger
-            )
-            if self.logger:
-                self.logger.info("Initialized CENTRALIZED mode with central path scheduler (bottleneck)")
+        # Performance optimizations (Mandatory)
+        self.use_cython = True # Always True now
         
-        # Performance optimizations
-        self.use_cython = use_cython and PERF_MODULE_AVAILABLE and CYTHON_AVAILABLE
         self.spatial_hash = None
-        if use_spatial_hash and PERF_MODULE_AVAILABLE:
+        if use_spatial_hash:
             self.spatial_hash = SpatialHash(
                 width=self.warehouse.width,
                 height=self.warehouse.height,
@@ -132,15 +127,136 @@ class WarehouseDSMModel(Model):
                 self.logger.info(f"Spatial hash ENABLED (cell_size=5, grid={self.spatial_hash.grid_width}x{self.spatial_hash.grid_height})")
         
         self.gossip_engine = None
-        if parallel_gossip and PERF_MODULE_AVAILABLE and self.mode != 'centralized':
+        # Disable parallel gossip for < 500 agents as overhead exceeds benefit
+        if parallel_gossip and self.mode != 'centralized' and self.num_agents >= 500:
             self.gossip_engine = ParallelGossipEngine(num_workers=gossip_workers)
             self.gossip_engine.start()
             if self.logger:
                 self.logger.info(f"Parallel gossip ENABLED (workers={gossip_workers})")
         
-        if self.use_cython and self.logger:
-            self.logger.info("Cython-accelerated hot paths ENABLED (A* + cache merging)")
-        
+        # Initialize fast A* arrays (Mandatory)
+        self.node_coords = None
+        self.graph_csr = None
+        try:
+            self.node_coords = self.warehouse.get_node_coords_array()
+            self.graph_csr = self.warehouse.get_csr_graph()
+            if self.logger:
+                self.logger.info("Cython-accelerated hot paths ENABLED (Fast C-arrays for A*)")
+        except Exception as e:
+             raise RuntimeError(f"CRITICAL: Failed to initialize fast A* arrays: {e}")
+
+        # Central scheduler (centralized mode only)
+        self.central_scheduler = None
+        if self.mode == 'centralized':
+            from central.scheduler import CentralizedScheduler
+            self.central_scheduler = CentralizedScheduler(
+                warehouse_graph=self.warehouse,
+                coordinator=self.coordinator,
+                logger=self.logger,
+                use_cython=True, # Mandatory
+                node_coords=self.node_coords,
+                graph_csr=self.graph_csr
+            )
+            if self.logger:
+                self.logger.info("Initialized CENTRALIZED mode with central path scheduler (bottleneck)")
+
+        # SHARED MEMORY ALLOCATION (Zero-Copy Gossip Engine)
+        self.shm_objects = []
+        self.shm_metadata = {}
+        if self.mode != 'centralized':
+            try:
+                num_nodes = self.warehouse.graph.number_of_nodes()
+                
+                # 1. Jam Values (Agents x Nodes, float32)
+                jam_size = self.num_agents * num_nodes * 4
+                self.shm_jam_vals = shared_memory.SharedMemory(create=True, size=jam_size)
+                self.shm_objects.append(self.shm_jam_vals)
+                
+                # 2. Jam Timestamps (Agents x Nodes, int64)
+                jam_ts_size = self.num_agents * num_nodes * 8
+                self.shm_jam_ts = shared_memory.SharedMemory(create=True, size=jam_ts_size)
+                self.shm_objects.append(self.shm_jam_ts)
+                
+                # 3. Flow Values (Agents x Nodes, float32)
+                flow_size = self.num_agents * num_nodes * 4
+                self.shm_flow_vals = shared_memory.SharedMemory(create=True, size=flow_size)
+                self.shm_objects.append(self.shm_flow_vals)
+                
+                # 4. Flow Timestamps (Agents x Nodes, int64)
+                flow_ts_size = self.num_agents * num_nodes * 8
+                self.shm_flow_ts = shared_memory.SharedMemory(create=True, size=flow_ts_size)
+                self.shm_objects.append(self.shm_flow_ts)
+                
+                # 5. Agent Locations (Agents x Agents, int32) - Belief matrix
+                # loc[i, j] = Agent i's belief of Agent j's location
+                loc_size = self.num_agents * self.num_agents * 4
+                self.shm_loc_vals = shared_memory.SharedMemory(create=True, size=loc_size)
+                self.shm_objects.append(self.shm_loc_vals)
+                
+                # 6. Agent Location Timestamps (Agents x Agents, int64)
+                loc_ts_size = self.num_agents * self.num_agents * 8
+                self.shm_loc_ts = shared_memory.SharedMemory(create=True, size=loc_ts_size)
+                self.shm_objects.append(self.shm_loc_ts)
+                
+                # 7. Path Intents (Agents x Agents x PathLen, int32) - Belief tensor
+                # paths[i, j, k] = Agent i's belief of Agent j's location at step k
+                path_len = 50  # Fixed horizon
+                path_size = self.num_agents * self.num_agents * path_len * 4
+                self.shm_path_vals = shared_memory.SharedMemory(create=True, size=path_size)
+                self.shm_objects.append(self.shm_path_vals)
+                
+                # 8. Path Intent Timestamps (Agents x Agents, int64) - One TS per path
+                path_ts_size = self.num_agents * self.num_agents * 8
+                self.shm_path_ts = shared_memory.SharedMemory(create=True, size=path_ts_size)
+                self.shm_objects.append(self.shm_path_ts)
+
+                # Initialize to zeros (and -1 for nodes)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.float32, buffer=self.shm_jam_vals.buf).fill(0)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.int64, buffer=self.shm_jam_ts.buf).fill(0)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.float32, buffer=self.shm_flow_vals.buf).fill(0)
+                np.ndarray((self.num_agents, num_nodes), dtype=np.int64, buffer=self.shm_flow_ts.buf).fill(0)
+                
+                # Init locations to -1 (unknown)
+                np.ndarray((self.num_agents, self.num_agents), dtype=np.int32, buffer=self.shm_loc_vals.buf).fill(-1)
+                np.ndarray((self.num_agents, self.num_agents), dtype=np.int64, buffer=self.shm_loc_ts.buf).fill(0)
+                
+                # Init paths to -1
+                np.ndarray((self.num_agents, self.num_agents, path_len), dtype=np.int32, buffer=self.shm_path_vals.buf).fill(-1)
+                np.ndarray((self.num_agents, self.num_agents), dtype=np.int64, buffer=self.shm_path_ts.buf).fill(0)
+                
+                self.shm_metadata = {
+                    'jam_vals_name': self.shm_jam_vals.name,
+                    'jam_ts_name': self.shm_jam_ts.name,
+                    'flow_vals_name': self.shm_flow_vals.name,
+                    'flow_ts_name': self.shm_flow_ts.name,
+                    'loc_vals_name': self.shm_loc_vals.name,
+                    'loc_ts_name': self.shm_loc_ts.name,
+                    'path_vals_name': self.shm_path_vals.name,
+                    'path_ts_name': self.shm_path_ts.name,
+                    'shape_jam': (self.num_agents, num_nodes),
+                    'shape_loc': (self.num_agents, self.num_agents),
+                    'shape_path': (self.num_agents, self.num_agents, path_len),
+                    'num_agents': self.num_agents
+                }
+                if self.logger:
+                    self.logger.info(f"Allocated {sum(s.size for s in self.shm_objects)/1024/1024:.1f} MB Shared Memory for Zero-Copy Gossip")
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to allocate Shared Memory: {e}")
+                self.cleanup_shm()
+                raise RuntimeError(f"CRITICAL: Shared Memory allocation failed. {e}")
+
+        # Initialize Gossip Engine with Shared Memory Metadata
+        self.gossip_engine = None
+        if parallel_gossip and self.mode != 'centralized' and self.num_agents >= 500:
+            self.gossip_engine = ParallelGossipEngine(
+                num_workers=gossip_workers,
+                shm_metadata=self.shm_metadata
+            )
+            self.gossip_engine.start()
+            if self.logger:
+                self.logger.info(f"Parallel gossip ENABLED (workers={gossip_workers})")
+
         # Agent scheduler
         self.schedule = RandomActivation(self)
         
@@ -173,12 +289,35 @@ class WarehouseDSMModel(Model):
         )
         
         self.running = True
+        
         # For runner compatibility
         self.completed_tasks = []
         self.failed_tasks = []
-        # Latency samples for completed tasks (seconds)
         self.completed_latencies = []
-        self.datacollector.collect(self)
+    
+    def cleanup_shm(self):
+        """Explicitly cleanup shared memory to prevent leaks"""
+        # Stop parallel gossip engine first (closes worker pool)
+        if hasattr(self, 'gossip_engine') and self.gossip_engine:
+            try:
+                self.gossip_engine.stop()
+            except Exception:
+                pass
+        
+        # Then cleanup shared memory
+        if hasattr(self, 'shm_objects'):
+            for shm in self.shm_objects:
+                try:
+                    shm.close()
+                    shm.unlink()
+                except Exception:
+                    pass
+            self.shm_objects.clear()
+    
+    def __del__(self):
+        """Cleanup on deletion"""
+        if hasattr(self, 'shm_objects'):
+            self.cleanup_shm()
     
     def _create_agents(self, agent_positions: List[tuple] = None):
         """Create and place agents in the warehouse"""
@@ -201,7 +340,7 @@ class WarehouseDSMModel(Model):
                     node_id = self.warehouse.node_id_from_pos((pos[0], pos[1])) if hasattr(self.warehouse, 'node_id_from_pos') else pos
                 else:
                     node_id = int(pos)
-                agent = RobotAgent(agent_id, self, node_id)
+                agent = RobotAgent(agent_id, self, node_id, shm_metadata=self.shm_metadata)
                 self.schedule.add(agent)
                 agent_id += 1
             return
@@ -218,7 +357,7 @@ class WarehouseDSMModel(Model):
                 
                 start_node = self.random.choice(available)
                 used_nodes.append(start_node)
-                agent = RobotAgent(agent_id, self, start_node)
+                agent = RobotAgent(agent_id, self, start_node, shm_metadata=self.shm_metadata)
                 self.schedule.add(agent)
                 agent_id += 1
     

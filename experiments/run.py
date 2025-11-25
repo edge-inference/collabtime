@@ -39,6 +39,11 @@ from world.model import WarehouseDSMModel
 from world.graph import WarehouseGraph
 from lf.bridge import LFTickClient
 
+# Import modular components
+from experiments.metrics import collect_step_metrics, collect_final_metrics
+from experiments.plotting import generate_dashboard_reports
+from experiments.batch_utils import generate_batch_experiment_list
+
 
 @dataclass
 class ExperimentResult:
@@ -52,6 +57,7 @@ class ExperimentResult:
     success: bool
     error_message: Optional[str] = None
     mode: Optional[str] = None
+    seed: Optional[int] = None
 
 
 class ExperimentRunner:
@@ -59,14 +65,17 @@ class ExperimentRunner:
     
     def __init__(self, config_path: str, output_dir: str = "results", duration_override: Optional[int] = None):
         """Initialize experiment runner with configuration."""
-        self.config_path = Path(config_path)
+        self.config_paths = []
+        if isinstance(config_path, list):
+            self.config_paths = [Path(p) for p in config_path]
+        else:
+            self.config_paths = [Path(config_path)]
+        
         self.file_handler = ResultsManager(output_dir)
         self.duration_override = duration_override
         
-        # Load experiment configurations
-        with open(self.config_path, 'r') as f:
-            self.config = yaml.safe_load(f)
-        
+        # Load and merge experiment configurations from all files
+        self.config = self._load_configs()
         self.experiments = self.config['experiments']
         self.metrics_config = self.config['metrics']
         self.output_config = self.config['output']
@@ -74,6 +83,30 @@ class ExperimentRunner:
         # Setup logging
         self.setup_logging()
         self.log_interval_steps = 100
+    
+    def _load_configs(self) -> Dict[str, Any]:
+        """Load and merge configurations from multiple files."""
+        merged_config = {
+            'experiments': {},
+            'metrics': {},
+            'output': {}
+        }
+        
+        for config_path in self.config_paths:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            # Merge experiments
+            if 'experiments' in config:
+                merged_config['experiments'].update(config['experiments'])
+            
+            # Use first config's metrics/output, or merge if needed
+            if 'metrics' in config and not merged_config['metrics']:
+                merged_config['metrics'] = config['metrics']
+            if 'output' in config and not merged_config['output']:
+                merged_config['output'] = config['output']
+        
+        return merged_config
         
     def setup_logging(self):
         """Configure logging for experiment tracking."""
@@ -112,10 +145,9 @@ class ExperimentRunner:
         
         return graph
         
-    def generate_agent_positions(self, agents_config: Dict, warehouse_graph: WarehouseGraph) -> List[tuple]:
+    def generate_agent_positions(self, agents_config: Dict, warehouse_graph: WarehouseGraph, seed: Optional[int] = None) -> List[tuple]:
         """Generate initial agent positions."""
         if isinstance(agents_config['initial_positions'], str) and agents_config['initial_positions'] == 'random':
-            # Generate random positions
             valid_nodes = [n for n in warehouse_graph.graph.nodes()
                           if warehouse_graph.node_types.get(n) in ('staging', 'aisle', 'buffer')
                           and warehouse_graph.capacities.get(n, 0) > 0
@@ -125,17 +157,17 @@ class ExperimentRunner:
                 raise ValueError("No valid starting positions found in warehouse graph!")
             
             positions = []
-            np.random.seed(42)  # For reproducibility
+            if seed is not None:
+                np.random.seed(seed)
             
             for _ in range(agents_config['count']):
                 pos = valid_nodes[np.random.randint(len(valid_nodes))]
                 positions.append(pos)
             return positions
         else:
-            # Use provided positions
             return [tuple(pos) for pos in agents_config['initial_positions']]
     
-    def run_single_experiment(self, config_name: str, config: Dict, use_lf: bool = False) -> ExperimentResult:
+    def run_single_experiment(self, config_name: str, config: Dict, use_lf: bool = False, seed_override: Optional[int] = None) -> ExperimentResult:
         """Run a single experiment configuration."""
         sim_mode = config.get('simulation', {}).get('mode', 'p2p')
         
@@ -161,6 +193,11 @@ class ExperimentRunner:
         duration = config['simulation']['duration']
         step_interval = config['simulation']['step_interval']
         seed = config.get('simulation', {}).get('seed', None)
+        
+        if seed_override is not None:
+            seed = seed_override
+            config['simulation']['seed'] = seed
+            self.logger.info(f"Seed overridden to: {seed}")
         
         if self.duration_override is not None:
             duration = self.duration_override
@@ -201,7 +238,7 @@ class ExperimentRunner:
         
         try:
             warehouse_graph = self.create_warehouse_graph(config['warehouse'])
-            agent_positions = self.generate_agent_positions(config['agents'], warehouse_graph)
+            agent_positions = self.generate_agent_positions(config['agents'], warehouse_graph, seed)
             
             duration = config['simulation']['duration']
             step_interval = config['simulation']['step_interval']
@@ -246,7 +283,7 @@ class ExperimentRunner:
                         break
                     model.step()
                     if current_step % 10 == 0:
-                        step_metrics = self.collect_step_metrics(model, current_step)
+                        step_metrics = collect_step_metrics(model, current_step)
                         metrics_data.append(step_metrics)
                         
                         if self.log_interval_steps > 0 and current_step % self.log_interval_steps == 0:
@@ -263,7 +300,7 @@ class ExperimentRunner:
                     model.step()
                     
                     if step % 10 == 0:
-                        step_metrics = self.collect_step_metrics(model, step)
+                        step_metrics = collect_step_metrics(model, step)
                         metrics_data.append(step_metrics)
                         
                         # Progress (step-based only)
@@ -277,7 +314,11 @@ class ExperimentRunner:
                             self.handle_agent_failures(model, config['agents']['failure_schedule'], step, step_interval)
             
             # Collect final metrics
-            final_metrics = self.collect_final_metrics(model, metrics_data, sim_duration_s=duration, step_interval_ms=step_interval)
+            final_metrics = collect_final_metrics(model, metrics_data, sim_duration_s=duration, step_interval_ms=step_interval)
+            
+            # Cleanup shared memory explicitly
+            if hasattr(model, 'cleanup_shm'):
+                model.cleanup_shm()
             
             end_time = datetime.now()
             duration_seconds = (end_time - start_time).total_seconds()
@@ -290,7 +331,8 @@ class ExperimentRunner:
                 metrics=final_metrics,
                 logs=[],
                 success=True,
-                mode=sim_mode
+                mode=sim_mode,
+                seed=seed
             )
             
             self.logger.info(f"Completed experiment: {config_name} in {duration_seconds:.2f}s")
@@ -311,7 +353,8 @@ class ExperimentRunner:
                 logs=[],
                 success=False,
                 error_message=str(e),
-                mode=sim_mode
+                mode=sim_mode,
+                seed=seed
             )
             
             self.logger.error(f"Failed experiment: {config_name} - {e}\n{full_trace}")
@@ -319,173 +362,6 @@ class ExperimentRunner:
         finally:
             self.logger.removeHandler(mode_file_handler)
             mode_file_handler.close()
-    
-    def collect_step_metrics(self, model: WarehouseDSMModel, step: int) -> Dict:
-        """Collect metrics for a single simulation step."""
-        cache_stats_per_agent = [
-            agent.local_cache.get_stats() if agent.local_cache else {}
-            for agent in model.schedule.agents
-        ]
-        
-        total_cache_entries = sum(
-            stats.get('flow_entries', 0) + stats.get('jam_entries', 0) + 
-            stats.get('agent_locations', 0) + stats.get('path_intents', 0) + 
-            stats.get('resource_states', 0)
-            for stats in cache_stats_per_agent
-        )
-        
-        total_jam_entries = sum(stats.get('jam_entries', 0) for stats in cache_stats_per_agent)
-        
-        # Compute unique jam metrics (avoid double-counting replicated jams via gossip)
-        # In centralized mode, use central scheduler data
-        unique_jams = {}
-        if model.mode == 'centralized' and model.central_scheduler:
-            # Centralized: use central jam data
-            for node_id, jam_value in model.central_scheduler.jam_data.items():
-                unique_jams[node_id] = {'value': jam_value, 'timestamp': step}
-        else:
-            # Distributed: aggregate from agent caches
-            for agent in model.schedule.agents:
-                if agent.local_cache:
-                    for node_id, jam_entry in agent.local_cache.jam_signal.items():
-                        if node_id not in unique_jams or jam_entry['timestamp'] > unique_jams[node_id]['timestamp']:
-                            unique_jams[node_id] = jam_entry
-        
-        num_jammed_nodes = len(unique_jams)
-        avg_jam_intensity = sum(entry['value'] for entry in unique_jams.values()) / num_jammed_nodes if num_jammed_nodes > 0 else 0.0
-        
-        agent_states = [agent.state for agent in model.schedule.agents]
-        working_count = sum(1 for state in agent_states if state.value == 'working')
-        navigating_count = sum(1 for state in agent_states if state.value == 'navigating')
-        utilization_working = working_count / len(agent_states) if agent_states else 0.0
-        utilization_active = (working_count + navigating_count) / len(agent_states) if agent_states else 0.0
-        
-        stuck_counters = [agent.stuck_counter for agent in model.schedule.agents]
-        num_stuck = sum(1 for sc in stuck_counters if sc > 0)
-        avg_stuck = sum(stuck_counters) / len(stuck_counters) if stuck_counters else 0.0
-        max_stuck = max(stuck_counters) if stuck_counters else 0
-        
-        stalls_in_transit = 0
-        stalls_at_resource = 0
-        stalls_idle = 0
-        
-        for agent in model.schedule.agents:
-            if agent.stuck_counter > 0:
-                if agent.state.value == 'navigating':
-                    if agent.task_location is not None and agent.node == agent.task_location:
-                        stalls_at_resource += 1
-                    else:
-                        stalls_in_transit += 1
-                elif agent.state.value == 'idle':
-                    stalls_idle += 1
-        
-        return {
-            'step': step,
-            'timestamp': time.time(),
-            'tasks_created': model.task_counter,
-            'tasks_completed': len([t for t in model.completed_tasks]),
-            'tasks_active': len([t for t in model.active_tasks]),
-            'agent_states': agent_states,
-            'cache_entries': total_cache_entries,
-            'jam_entries': total_jam_entries,
-            'num_jammed_nodes': num_jammed_nodes,
-            'jam_intensity_avg': avg_jam_intensity,
-            'gossip_rounds': step // 3,
-            'utilization_working': utilization_working,
-            'utilization_active': utilization_active,
-            'num_stuck_agents': num_stuck,
-            'avg_stuck_counter': avg_stuck,
-            'max_stuck_counter': max_stuck,
-            'stalls_in_transit': stalls_in_transit,
-            'stalls_at_resource': stalls_at_resource,
-            'stalls_idle': stalls_idle
-        }
-    
-    def collect_final_metrics(self, model: WarehouseDSMModel, step_data: List[Dict], sim_duration_s: float, step_interval_ms: int) -> Dict:
-        """Collect and aggregate final experiment metrics."""
-        # Convert step data to DataFrame for analysis
-        df = pd.DataFrame(step_data)
-        
-        # Performance metrics
-        total_tasks = model.task_counter
-        
-        # Extract completion times from task records (now dicts with timestamps)
-        completion_times = []
-        for t in model.completed_tasks:
-            if isinstance(t, dict) and 'completion_time' in t and 'start_time' in t:
-                if t['completion_time'] and t['start_time']:
-                    completion_times.append(t['completion_time'] - t['start_time'])
-        latencies_s = completion_times
-        p50 = float(np.percentile(latencies_s, 50)) if latencies_s else 0.0
-        p90 = float(np.percentile(latencies_s, 90)) if latencies_s else 0.0
-        p99 = float(np.percentile(latencies_s, 99)) if latencies_s else 0.0
-        throughput_tps = (len(model.completed_tasks) / sim_duration_s) if sim_duration_s > 0 else 0.0
-        
-        tasks_claimed = sum(agent.metrics['tasks_claimed'] for agent in model.schedule.agents)
-        
-        performance_metrics = {
-            'tasks_completed': len(model.completed_tasks),
-            'tasks_failed': len(model.failed_tasks),
-            'tasks_claimed': tasks_claimed,
-            'completion_rate': len(model.completed_tasks) / total_tasks if total_tasks > 0 else 0,
-            'claimed_completion_rate': len(model.completed_tasks) / tasks_claimed if tasks_claimed > 0 else 0,
-            'average_completion_time': np.mean(latencies_s) if latencies_s else 0,
-            'latency_p50': p50,
-            'latency_p90': p90,
-            'latency_p99': p99,
-            'throughput_tps': throughput_tps,
-            'sim_duration_s': float(sim_duration_s),
-            'step_interval_ms': int(step_interval_ms),
-            'total_distance_traveled': sum(agent.total_distance for agent in model.schedule.agents),
-            'agent_utilization': np.mean([agent.utilization for agent in model.schedule.agents])
-        }
-        
-        # Data plane metrics depend on mode
-        if model.mode == 'centralized':
-            # Centralized: report central scheduler data store size
-            avg_cache_size = model.central_scheduler.metrics['congestion_data_size'] if model.central_scheduler else 0
-            total_gossip_rounds = 0
-        else:
-            # Distributed: report per-agent local cache and gossip
-            avg_cache_size = np.mean([
-                sum(agent.local_cache.get_stats().values()) if agent.local_cache else 0
-                for agent in model.schedule.agents
-            ])
-            total_gossip_rounds = df['gossip_rounds'].max() if 'gossip_rounds' in df else 0
-        
-        coordination_metrics = {
-            'avg_cache_size': float(avg_cache_size),
-            'total_gossip_rounds': int(total_gossip_rounds),
-            'tasks_in_registry': len(model.coordinator.task_registry.tasks),
-            'active_leases': len([l for l in model.coordinator.lease_manager.leases.values() if l]),
-            'coordination_mode': model.mode
-        }
-        
-        time_series = {
-            'tasks_created_timeline': df['tasks_created'].tolist(),
-            'task_completion_timeline': df['tasks_completed'].tolist(),
-            'tasks_active_timeline': df['tasks_active'].tolist(),
-            'cache_entries_timeline': df.get('cache_entries', []).tolist() if 'cache_entries' in df else [],
-            'jam_entries_timeline': df.get('jam_entries', []).tolist() if 'jam_entries' in df else [],
-            'num_jammed_nodes_timeline': df.get('num_jammed_nodes', []).tolist() if 'num_jammed_nodes' in df else [],
-            'jam_intensity_avg_timeline': df.get('jam_intensity_avg', []).tolist() if 'jam_intensity_avg' in df else [],
-            'utilization_working_timeline': df.get('utilization_working', []).tolist() if 'utilization_working' in df else [],
-            'utilization_active_timeline': df.get('utilization_active', []).tolist() if 'utilization_active' in df else [],
-            'num_stuck_agents_timeline': df.get('num_stuck_agents', []).tolist() if 'num_stuck_agents' in df else [],
-            'avg_stuck_counter_timeline': df.get('avg_stuck_counter', []).tolist() if 'avg_stuck_counter' in df else [],
-            'max_stuck_counter_timeline': df.get('max_stuck_counter', []).tolist() if 'max_stuck_counter' in df else [],
-            'stalls_in_transit_timeline': df.get('stalls_in_transit', []).tolist() if 'stalls_in_transit' in df else [],
-            'stalls_at_resource_timeline': df.get('stalls_at_resource', []).tolist() if 'stalls_at_resource' in df else [],
-            'stalls_idle_timeline': df.get('stalls_idle', []).tolist() if 'stalls_idle' in df else [],
-            'steps': df['step'].tolist(),
-            'latency_samples_s': latencies_s
-        }
-        
-        return {
-            'performance': performance_metrics,
-            'coordination': coordination_metrics,
-            'time_series': time_series
-        }
     
     def handle_agent_failures(self, model: WarehouseDSMModel, failure_schedule: List[Dict], 
                             current_step: int, step_interval: int):
@@ -549,7 +425,7 @@ class ExperimentRunner:
             # Save detailed JSON
             detailed_results = {
                 'timestamp': timestamp,
-                'config_path': str(self.config_path),
+                'config_paths': [str(p) for p in self.config_paths],
                 'mode': mode,
                 'results': [asdict(result) for result in group]
             }
@@ -562,326 +438,10 @@ class ExperimentRunner:
     
     def _generate_mode_plots(self, results: List[ExperimentResult], timestamp: str, out_dir: Path):
         """Generate plots for a specific mode in the given output directory."""
-        self.generate_plots(results, timestamp, out_dir)
         plots = self.output_config.get('plots')
         if isinstance(plots, list) and 'dashboard_style' in plots:
-            self.generate_dashboard_reports(results, timestamp, out_dir)
-    
-    def generate_plots(self, results: List[ExperimentResult], timestamp: str, out_dir: Path):
-        """Generate visualization plots for experiment results."""
-        successful_results = [r for r in results if r.success]
-        
-        if not successful_results:
-            self.logger.warning("No successful experiments to plot")
-            return
-        
-        self.logger.info(f"Plots saved to {out_dir}")
-
-    def _calculate_throughput_series(self, completed_timeline: List[int], time_points: List[float], window_s: float = 30.0) -> List[float]:
-        """Calculate moving average throughput over time (tasks per second)."""
-        if not completed_timeline or not time_points:
-            return []
-        
-        throughput = []
-        for i, current_time in enumerate(time_points):
-            cutoff_time = current_time - window_s
-            start_idx = 0
-            for j in range(i - 1, -1, -1):
-                if time_points[j] <= cutoff_time:
-                    start_idx = j
-                    break
+            generate_dashboard_reports(results, timestamp, out_dir)
             
-            if start_idx < i:
-                completed_at_start = completed_timeline[start_idx]
-                completed_now = completed_timeline[i]
-                actual_window = current_time - time_points[start_idx]
-                
-                if actual_window > 0:
-                    tps = (completed_now - completed_at_start) / actual_window
-                    throughput.append(tps * 60.0)
-                else:
-                    throughput.append(0.0)
-            else:
-                if current_time > 0:
-                    throughput.append(completed_timeline[i] / current_time * 60.0)
-                else:
-                    throughput.append(0.0)
-        
-        return throughput
-    
-    def _calculate_latency_series(self, latency_samples: List[float], completed_timeline: List[int], window_size: int = 50) -> List[float]:
-        """Calculate rolling average latency over completed tasks."""
-        if not latency_samples or not completed_timeline:
-            return []
-        
-        latency_series = []
-        current_task_idx = 0
-        
-        for num_completed in completed_timeline:
-            if num_completed > 0 and current_task_idx < len(latency_samples):
-                start_idx = max(0, current_task_idx - window_size + 1)
-                end_idx = min(current_task_idx + 1, len(latency_samples))
-                
-                if start_idx < end_idx:
-                    window_latencies = latency_samples[start_idx:end_idx]
-                    avg_lat = sum(window_latencies) / len(window_latencies)
-                    latency_series.append(avg_lat)
-                else:
-                    latency_series.append(0.0)
-                
-                if current_task_idx < num_completed:
-                    current_task_idx = min(num_completed, len(latency_samples))
-            else:
-                latency_series.append(latency_series[-1] if latency_series else 0.0)
-        
-        return latency_series
-
-    def generate_dashboard_reports(self, results: List[ExperimentResult], timestamp: str, out_dir: Path):
-        """Generate per-experiment dashboard-style plots and CSV with key metrics."""
-        successful = [r for r in results if r.success]
-        if not successful:
-            return
-        rows = []
-        for r in successful:
-            perf = r.metrics.get('performance', {})
-            ts = r.metrics.get('time_series', {})
-            steps = ts.get('steps', [])
-            created = ts.get('tasks_created_timeline', [])
-            completed = ts.get('task_completion_timeline', [])
-            active = ts.get('tasks_active_timeline', [])
-            lat_samples = ts.get('latency_samples_s', [])
-            step_interval_ms = perf.get('step_interval_ms', 100)
-            step_dt = step_interval_ms / 1000.0
-            
-            time_points = [s * step_dt for s in steps]
-            throughput_series = self._calculate_throughput_series(completed, time_points, window_s=30.0)
-            latency_series = self._calculate_latency_series(lat_samples, completed, window_size=50)
-            
-            fig, axes = plt.subplots(2, 2, figsize=(18, 10))
-            axes = axes.flatten()
-            
-            # Task Timeline - created/completed/active
-            if time_points and created and completed and active:
-                axes[0].plot(time_points, created, color='tab:blue', linewidth=2, label='Created', alpha=0.8)
-                axes[0].plot(time_points, completed, color='tab:green', linewidth=2, label='Completed', alpha=0.8)
-                axes[0].plot(time_points, active, color='tab:orange', linewidth=2, label='Active', alpha=0.8)
-                axes[0].set_title(f"Task Timeline: {r.config_name}")
-                axes[0].set_xlabel('Time (s)')
-                axes[0].set_ylabel('Task Count')
-                axes[0].legend()
-                axes[0].grid(True, alpha=0.3)
-            else:
-                axes[0].text(0.5, 0.5, 'No task timeline data', ha='center', va='center', transform=axes[0].transAxes)
-                axes[0].set_title(f"Task Timeline: {r.config_name}")
-            
-            # Throughput - continuous plot with 30s moving average
-            if throughput_series:
-                thr_time_points = time_points[:len(throughput_series)]
-                axes[1].plot(thr_time_points, throughput_series, color='tab:orange', linewidth=2, label='30s moving avg')
-                axes[1].set_title('Throughput over time')
-                axes[1].set_xlabel('Time (s)')
-                axes[1].set_ylabel('Tasks/min')
-                axes[1].legend()
-                axes[1].grid(True, alpha=0.3)
-            else:
-                axes[1].text(0.5, 0.5, 'No throughput data', ha='center', va='center', transform=axes[1].transAxes)
-                axes[1].set_title('Throughput over time')
-            
-            # Latency - continuous plot with rolling average
-            if latency_series:
-                lat_time_points = time_points[:len(latency_series)]
-                axes[2].plot(lat_time_points, latency_series, color='tab:green', linewidth=2, label='Rolling avg (50 tasks)')
-                axes[2].set_title('Latency over time')
-                axes[2].set_xlabel('Time (s)')
-                axes[2].set_ylabel('Latency (s)')
-                axes[2].legend()
-                axes[2].grid(True, alpha=0.3)
-            else:
-                axes[2].text(0.5, 0.5, 'No latency data', ha='center', va='center', transform=axes[2].transAxes)
-                axes[2].set_title('Latency over time')
-            
-            # Utilization - working and active (busy) agents over time
-            util_working = ts.get('utilization_working_timeline', [])
-            util_active = ts.get('utilization_active_timeline', [])
-            
-            if util_working and util_active and len(util_working) > 0:
-                util_time_points = time_points[:len(util_working)]
-                axes[3].plot(util_time_points, util_working, color='tab:blue', linewidth=2.5, label='Working', alpha=0.9)
-                axes[3].plot(util_time_points, util_active, color='tab:orange', linewidth=2.5, label='Active (Working + Navigating)', alpha=0.9)
-                axes[3].set_title('Agent Utilization over time')
-                axes[3].set_xlabel('Time (s)')
-                axes[3].set_ylabel('Utilization (fraction of agents)')
-                axes[3].set_ylim([0, 1.05])
-                axes[3].legend(loc='best')
-                axes[3].grid(True, alpha=0.3)
-                # Debug: print data ranges
-                if util_working:
-                    self.logger.info(f"Utilization plot data - working: min={min(util_working):.3f}, max={max(util_working):.3f}, samples={len(util_working)}")
-                if util_active:
-                    self.logger.info(f"Utilization plot data - active: min={min(util_active):.3f}, max={max(util_active):.3f}, samples={len(util_active)}")
-            else:
-                axes[3].text(0.5, 0.5, f'No utilization data (working={len(util_working)}, active={len(util_active)})', 
-                           ha='center', va='center', transform=axes[3].transAxes, fontsize=10)
-                axes[3].set_title('Agent Utilization over time')
-                axes[3].set_xlabel('Time (s)')
-                axes[3].set_ylabel('Utilization (fraction of agents)')
-                axes[3].set_ylim([0, 1.0])
-                axes[3].grid(True, alpha=0.3)
-            
-            plt.tight_layout()
-            out_png = out_dir / f"dashboard_report_{r.config_name}_{timestamp}.png"
-            plt.savefig(out_png, dpi=200)
-            plt.close(fig)
-            
-            # Generate separate system performance plot
-            self._generate_system_perf_plot(r, timestamp, out_dir, time_points, ts)
-            
-            rows.append({
-                'config_name': r.config_name,
-                'tasks_completed': perf.get('tasks_completed', 0),
-                'tasks_failed': perf.get('tasks_failed', 0),
-                'completion_rate': perf.get('completion_rate', 0.0),
-                'avg_latency_s': perf.get('average_completion_time', 0.0),
-                'p50_latency_s': perf.get('latency_p50', 0.0),
-                'p90_latency_s': perf.get('latency_p90', 0.0),
-                'p99_latency_s': perf.get('latency_p99', 0.0),
-                'throughput_tps': perf.get('throughput_tps', 0.0),
-            })
-        df = pd.DataFrame(rows)
-        df.to_csv(out_dir / f"dashboard_metrics_{timestamp}.csv", index=False)
-    
-    def _generate_system_perf_plot(self, result: ExperimentResult, timestamp: str, out_dir: Path, 
-                                    time_points: List[float], ts: Dict):
-        """Generate standalone system performance plot (cache, gossip, contention, etc.)."""
-        cache_entries = ts.get('cache_entries_timeline', [])
-        coord = result.metrics.get('coordination', {})
-        
-        if not cache_entries:
-            return
-        
-        fig, axes = plt.subplots(2, 3, figsize=(20, 10))
-        axes = axes.flatten()
-        
-        # Cache entries over time
-        cache_time_points = time_points[:len(cache_entries)]
-        if cache_entries:
-            axes[0].plot(cache_time_points, cache_entries, color='tab:purple', linewidth=2)
-            axes[0].set_title(f'DSM Cache Entries: {result.config_name}')
-            axes[0].set_xlabel('Time (s)')
-            axes[0].set_ylabel('Total Cache Entries')
-            axes[0].grid(True, alpha=0.3)
-        
-        # High-value coordination metrics (bar chart)
-        high_labels = ['Avg Cache\nSize', 'Total Gossip\nRounds']
-        high_values = [
-            coord.get('avg_cache_size', 0),
-            coord.get('total_gossip_rounds', 0)
-        ]
-        colors_high = ['tab:purple', 'tab:cyan']
-        axes[1].bar(high_labels, high_values, color=colors_high, alpha=0.7)
-        axes[1].set_title('DSM Overhead')
-        axes[1].set_ylabel('Count')
-        axes[1].grid(True, alpha=0.3, axis='y')
-        
-        # Low-value coordination metrics (separate scale)
-        low_labels = ['Tasks in\nRegistry', 'Active\nLeases']
-        low_values = [
-            coord.get('tasks_in_registry', 0),
-            coord.get('active_leases', 0)
-        ]
-        colors_low = ['tab:orange', 'tab:red']
-        axes[2].bar(low_labels, low_values, color=colors_low, alpha=0.7)
-        axes[2].set_title('Coordinator State')
-        axes[2].set_ylabel('Count')
-        axes[2].grid(True, alpha=0.3, axis='y')
-        
-        # Congestion: Number of jammed nodes vs Average jam severity
-        num_jammed_nodes = ts.get('num_jammed_nodes_timeline', [])
-        jam_intensity_avg = ts.get('jam_intensity_avg_timeline', [])
-        
-        if num_jammed_nodes and jam_intensity_avg:
-            contention_time = time_points[:len(num_jammed_nodes)]
-            
-            # Dual-axis: # jammed nodes (spread) vs avg jam severity (intensity)
-            axes[3].plot(contention_time, num_jammed_nodes, color='#1f77b4', linewidth=2.5, label='# Jammed Nodes', alpha=0.9)
-            ax3_twin = axes[3].twinx()
-            ax3_twin.plot(contention_time, jam_intensity_avg, color='#9467bd', linewidth=2.5, label='Avg Jam Severity', alpha=0.9, linestyle='--')
-            
-            axes[3].set_title('Congestion: Spread vs Severity')
-            axes[3].set_xlabel('Time (s)')
-            axes[3].set_ylabel('# Jammed Nodes (spread)', color='#1f77b4')
-            axes[3].tick_params(axis='y', labelcolor='#1f77b4')
-            ax3_twin.set_ylabel('Avg Jam Severity (0-5)', color='#9467bd')
-            ax3_twin.tick_params(axis='y', labelcolor='#9467bd')
-            ax3_twin.set_ylim([0, 5.5])
-            axes[3].grid(True, alpha=0.3)
-            
-            lines1, labels1 = axes[3].get_legend_handles_labels()
-            lines2, labels2 = ax3_twin.get_legend_handles_labels()
-            axes[3].legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=9)
-        else:
-            axes[3].text(0.5, 0.5, f'No congestion data (nodes={len(num_jammed_nodes)}, severity={len(jam_intensity_avg)})', 
-                        ha='center', va='center', transform=axes[3].transAxes, fontsize=10)
-            axes[3].set_title('Congestion: Spread vs Severity')
-        
-        # Point Contention: Number of stalled agents vs avg stall duration
-        num_stuck = ts.get('num_stuck_agents_timeline', [])
-        avg_stuck_counter = ts.get('avg_stuck_counter_timeline', [])
-        
-        if num_stuck and avg_stuck_counter:
-            stall_time = time_points[:len(num_stuck)]
-            
-            axes[4].plot(stall_time, num_stuck, color='#d62728', linewidth=2.5, label='# Stalled Agents', alpha=0.9)
-            ax4_twin = axes[4].twinx()
-            ax4_twin.plot(stall_time, avg_stuck_counter, color='#ff7f0e', linewidth=2.5, label='Avg Stall Duration', alpha=0.9, linestyle='--')
-            
-            axes[4].set_title('Point Contention: Stalled Agents vs Stall Duration')
-            axes[4].set_xlabel('Time (s)')
-            axes[4].set_ylabel('# Stalled Agents (count)', color='#d62728')
-            axes[4].tick_params(axis='y', labelcolor='#d62728')
-            ax4_twin.set_ylabel('Avg Stall Duration (steps)', color='#ff7f0e')
-            ax4_twin.tick_params(axis='y', labelcolor='#ff7f0e')
-            axes[4].grid(True, alpha=0.3)
-            
-            lines1, labels1 = axes[4].get_legend_handles_labels()
-            lines2, labels2 = ax4_twin.get_legend_handles_labels()
-            axes[4].legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=9)
-        else:
-            axes[4].text(0.5, 0.5, f'No point contention data (stuck={len(num_stuck)}, duration={len(avg_stuck_counter)})', 
-                        ha='center', va='center', transform=axes[4].transAxes, fontsize=10)
-            axes[4].set_title('Point Contention: Stalled Agents vs Stall Duration')
-        
-        # Stall Location Breakdown: Where agents are getting stuck
-        stalls_in_transit = ts.get('stalls_in_transit_timeline', [])
-        stalls_at_resource = ts.get('stalls_at_resource_timeline', [])
-        stalls_idle = ts.get('stalls_idle_timeline', [])
-        
-        if stalls_in_transit and stalls_at_resource:
-            stall_loc_time = time_points[:len(stalls_in_transit)]
-            
-            axes[5].stackplot(stall_loc_time,
-                             stalls_in_transit,
-                             stalls_at_resource,
-                             stalls_idle,
-                             labels=['In Transit (Aisle)', 'At Resource (Pickup/Drop)', 'Idle'],
-                             colors=['#8c564b', '#e377c2', '#7f7f7f'],
-                             alpha=0.7)
-            
-            axes[5].set_title('Stall Location Breakdown: Where Agents Get Stuck')
-            axes[5].set_xlabel('Time (s)')
-            axes[5].set_ylabel('# Stalled Agents by Location')
-            axes[5].legend(loc='upper right', fontsize=9)
-            axes[5].grid(True, alpha=0.3)
-        else:
-            axes[5].text(0.5, 0.5, f'No stall location data', 
-                        ha='center', va='center', transform=axes[5].transAxes, fontsize=10)
-            axes[5].set_title('Stall Location Breakdown')
-        
-        plt.tight_layout()
-        out_png = out_dir / f"system_perf_{result.config_name}_{timestamp}.png"
-        plt.savefig(out_png, dpi=200)
-        plt.close(fig)
-    
     def _extract_config_details(self, experiment_names: List[str]) -> Dict:
         """Extract configuration details for metadata"""
         config_details = {}
@@ -932,7 +492,7 @@ class ExperimentRunner:
         
         return config_details
     
-    def run_experiments(self, experiment_names: Optional[List[str]] = None, use_lf: bool = False) -> List[ExperimentResult]:
+    def run_experiments(self, experiment_names: Optional[List[str]] = None, use_lf: bool = False, seeds: Optional[List[int]] = None) -> List[ExperimentResult]:
         """Run specified experiments or all if none specified."""
         if experiment_names is None:
             experiment_names = list(self.experiments.keys())
@@ -954,8 +514,17 @@ class ExperimentRunner:
                 continue
                 
             config = self.experiments[exp_name]
-            result = self.run_single_experiment(exp_name, config, use_lf=use_lf)
-            results.append(result)
+            
+            run_seeds = seeds if seeds else [config.get('simulation', {}).get('seed', 42)]
+            if not run_seeds:
+                run_seeds = [42]
+                
+            for seed in run_seeds:
+                if len(run_seeds) > 1:
+                    self.logger.info(f"Running {exp_name} with seed {seed}")
+                
+                result = self.run_single_experiment(exp_name, config, use_lf=use_lf, seed_override=seed)
+                results.append(result)
         
         self.save_results(results)
         self.file_handler.mark_run_complete()
@@ -1002,17 +571,23 @@ def start_lf_coordinator():
     return proc
 
 
+
+
 def main():
     """Main entry point for experiment runner."""
     parser = argparse.ArgumentParser(description='Run warehouse DSM experiments')
-    parser.add_argument('--config', '-c', default='./experiments/configs.yaml',
-                       help='Path to experiment configuration file')
+    parser.add_argument('--config', '-c', nargs='+', default=['small.yaml'],
+                       help='Config file(s): small.yaml, medium.yaml, or large.yaml. Multiple files will be merged.')
     parser.add_argument('--output', '-o', default='results',
                        help='Output directory for results')
     parser.add_argument('--experiments', '-e', nargs='+',
                        help='Specific experiments to run (default: all)')
     parser.add_argument('--parallel', '-p', action='store_true',
                        help='Run experiments in parallel')
+    parser.add_argument('--batch', '-b', choices=['scales', 'paired', 'all'],
+                       help='Batch mode: scales=600,700,...1000, paired=dist+cent for each scale, all=everything')
+    parser.add_argument('--scale-range', nargs=2, type=int, metavar=('MIN', 'MAX'),
+                       help='Agent count range for batch mode (e.g., 600 1000)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
     lf_group = parser.add_mutually_exclusive_group()
@@ -1025,6 +600,10 @@ def main():
                        help='Progress log interval in steps (default: 100). Use 0 to disable.')
     parser.add_argument('--duration', '-d', type=int, default=None,
                        help='Override simulation duration in seconds')
+    
+    parser.add_argument('--seeds', nargs='+', type=int, help='Specific seeds to run (e.g. 42 100 999)')
+    parser.add_argument('--repeat', type=int, default=1, help='Number of times to repeat each experiment (auto-generating seeds starting from config seed)')
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -1044,14 +623,52 @@ def main():
             print("\nOr use --no-lf for non-deterministic testing (NOT recommended for experiments).")
             sys.exit(1)
     
+    # Process config paths - allow simple names like "large.yaml" or full paths
+    config_paths = []
+    experiments_dir = Path(__file__).parent
+    configs_dir = experiments_dir / 'configs'
+    
+    for cfg in args.config:
+        cfg_path = Path(cfg)
+        if not cfg_path.exists():
+            alt_path = configs_dir / cfg
+            if alt_path.exists():
+                config_paths.append(str(alt_path))
+            elif (experiments_dir / cfg).exists():
+                config_paths.append(str(experiments_dir / cfg))
+            else:
+                config_paths.append(cfg)
+        else:
+            config_paths.append(cfg)
+    
     # Initialize runner
-    runner = ExperimentRunner(args.config, args.output, duration_override=args.duration)
+    runner = ExperimentRunner(config_paths, args.output, duration_override=args.duration)
     if args.log_interval is not None:
         runner.log_interval_steps = max(0, int(args.log_interval))
     
+    # Handle batch mode
+    experiments_to_run = args.experiments
+    if args.batch:
+        experiments_to_run = generate_batch_experiment_list(
+            args.batch, 
+            runner.experiments,
+            args.scale_range
+        )
+        print(f"\nBatch mode '{args.batch}': Running {len(experiments_to_run)} experiments")
+        for exp in experiments_to_run:
+            print(f"  - {exp}")
+        print()
+    
+    seeds_to_run = None
+    if args.seeds:
+        seeds_to_run = args.seeds
+    elif args.repeat > 1:
+        well_separated_seeds = [42, 1337, 9999, 54321, 123456, 777777, 314159, 271828, 161803, 866025]
+        seeds_to_run = well_separated_seeds[:args.repeat]
+
     # Run experiments
     start_time = time.time()
-    results = runner.run_experiments(args.experiments, use_lf=args.lf)
+    results = runner.run_experiments(experiments_to_run, use_lf=args.lf, seeds=seeds_to_run)
     total_time = time.time() - start_time
     
     # Print summary

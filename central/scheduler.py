@@ -4,9 +4,17 @@ All agents request paths from this single authority, which has perfect global st
 but must serialize all pathfinding operations.
 """
 
-from typing import List, Dict, Tuple, Optional, Set
+from typing import List, Dict, Tuple, Optional, Set, Any
 import networkx as nx
 from collections import defaultdict
+import numpy as np
+import time
+
+# Fail Fast: Mandatory Optimization
+try:
+    from perf.astar_fast import astar_fast
+except ImportError:
+    raise RuntimeError("CRITICAL: Cython extension 'astar_fast' missing. Simulation requires compiled optimizations.")
 
 
 class CentralizedScheduler:
@@ -15,11 +23,12 @@ class CentralizedScheduler:
     
     This is the architectural bottleneck that distributed systems avoid.
     - Has perfect global state (all agent positions, all reserved paths)
-    - Must serialize all pathfinding requests
+    - Must serialize all pathfinding operations
     - Runs space-time A* to avoid conflicts
     """
     
-    def __init__(self, warehouse_graph, coordinator, logger=None):
+    def __init__(self, warehouse_graph, coordinator, logger=None, 
+                 use_cython: bool = True, node_coords: Any = None, graph_csr: Any = None):
         self.graph = warehouse_graph
         self.coordinator = coordinator
         self.logger = logger
@@ -32,6 +41,30 @@ class CentralizedScheduler:
         # Central congestion data store (perfect, always fresh)
         self.flow_data: Dict[int, float] = defaultdict(float)
         self.jam_data: Dict[int, float] = defaultdict(float)
+        
+        # Performance optimizations (Mandatory)
+        self.use_cython = True
+        self.node_coords = node_coords
+        self.graph_csr = graph_csr
+        
+        if not self.graph_csr:
+             raise RuntimeError("CRITICAL: CentralizedScheduler missing graph_csr. Fast A* impossible.")
+        
+        # Fast arrays for Cython A*
+        num_nodes = warehouse_graph.graph.number_of_nodes()
+        
+        # We use 1D arrays for the "global" map.
+        self.fast_jam_values = np.zeros(num_nodes, dtype=np.float32)
+        self.fast_jam_timestamps = np.zeros(num_nodes, dtype=np.int64)
+        self.fast_flow_values = np.zeros(num_nodes, dtype=np.float32)
+        self.fast_flow_timestamps = np.zeros(num_nodes, dtype=np.int64)
+        
+        # Dummy path vals (reservation logic handled separately or TODO: map reservations here)
+        self.fast_path_vals = np.zeros((1, 1), dtype=np.int32)
+        self.fast_path_timestamps = np.zeros(1, dtype=np.int64)
+        
+        if self.logger:
+            self.logger.info("CentralizedScheduler: Cython-accelerated A* ENABLED (Mandatory)")
         
         self.metrics = {
             'total_requests': 0,
@@ -75,6 +108,11 @@ class CentralizedScheduler:
         best_task = None
         best_distance = float('inf')
         
+        scan_limit = 200
+        scanned = 0
+        
+        agent_pos_coords = self.graph.node_to_pos(agent_position)
+        
         for task in available_tasks:
             # Skip if task is already assigned to another agent
             if task.task_id in self.assigned_task_ids:
@@ -83,9 +121,14 @@ class CentralizedScheduler:
             # Skip if location is already assigned
             if task.location in assigned_locations:
                 continue
+                
+            scanned += 1
+            if scanned > scan_limit and best_task:
+                break
             
-            distance = abs(self.graph.node_to_pos(agent_position)[0] - self.graph.node_to_pos(task.location)[0]) + \
-                      abs(self.graph.node_to_pos(agent_position)[1] - self.graph.node_to_pos(task.location)[1])
+            task_coords = self.graph.node_to_pos(task.location)
+            distance = abs(agent_pos_coords[0] - task_coords[0]) + \
+                      abs(agent_pos_coords[1] - task_coords[1])
             
             if distance < best_distance:
                 best_distance = distance
@@ -106,12 +149,22 @@ class CentralizedScheduler:
     def report_flow(self, node: int, flow_value: float = 1.0):
         """Agent reports edge usage (perfect, instant update)."""
         self.flow_data[node] += flow_value
+        # Fast array update
+        self.fast_flow_values[node] += flow_value
+        self.fast_flow_timestamps[node] = int(time.time() * 1000)
+            
         self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
     
     def report_jam(self, node: int, jam_value: float):
         """Agent reports congestion (perfect, instant update)."""
         alpha = 0.5
+        # Python dict update
         self.jam_data[node] = alpha * jam_value + (1 - alpha) * self.jam_data[node]
+        
+        # Fast array update
+        self.fast_jam_values[node] = alpha * jam_value + (1 - alpha) * self.fast_jam_values[node]
+        self.fast_jam_timestamps[node] = int(time.time() * 1000)
+            
         self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
     
     def request_path(self, agent_id: int, start: int, goal: int, current_step: int) -> List[int]:
@@ -123,14 +176,14 @@ class CentralizedScheduler:
         """
         self.metrics['total_requests'] += 1
         
-        occupied_nodes = set(self.agent_positions.values())
-        occupied_nodes.discard(start)
+        # occupied_nodes = set(self.agent_positions.values()) # Deprecated for fast A*
         
         try:
             if start == goal:
                 return [start]
             
-            path = self._astar_with_congestion(start, goal, occupied_nodes)
+            # Optimized Pathfinding (Mandatory)
+            path = self._astar_fast_centralized(start, goal)
             
             if path:
                 self.path_reservations[agent_id] = path[:min(3, len(path))]
@@ -150,11 +203,38 @@ class CentralizedScheduler:
             del self.path_reservations[agent_id]
             self.metrics['active_reservations'] = len(self.path_reservations)
     
+    def _astar_fast_centralized(self, start: int, goal: int) -> List[int]:
+        """Cython-accelerated A* using global arrays."""
+        indptr, indices, _ = self.graph_csr
+        current_time_ms = int(time.time() * 1000)
+        cost_params = {
+            'alpha': 2.0,
+            'beta': 0.5,
+            'max_aoi_ms': 999999999,
+            'proximity_radius': 25.0,
+            'conflict_penalty': 100.0
+        }
+        
+        path = astar_fast(
+            indptr=indptr,
+            indices=indices,
+            coords=self.node_coords,
+            jam_values=self.fast_jam_values,
+            jam_timestamps=self.fast_jam_timestamps,
+            flow_values=self.fast_flow_values,
+            flow_timestamps=self.fast_flow_timestamps,
+            path_vals=self.fast_path_vals, # Dummy
+            path_timestamps=self.fast_path_timestamps, # Dummy
+            start=start,
+            goal=goal,
+            cost_params=cost_params,
+            current_time_ms=current_time_ms
+        )
+        return path
+        
     def _astar_with_congestion(self, start: int, goal: int, obstacles: set) -> List[int]:
         """
-        Congestion-aware A* using central perfect data.
-        
-        Same algorithm as distributed but with PERFECT data (no AoI).
+        Congestion-aware A* using central perfect data (Python fallback).
         """
         if start in obstacles or goal in obstacles:
             obstacles_copy = obstacles - {start, goal}
@@ -186,8 +266,6 @@ class CentralizedScheduler:
     def _edge_cost_with_congestion(self, from_node: int, to_node: int) -> float:
         """
         Compute edge cost with congestion (PERFECT data, no staleness).
-        
-        Uses same cost model as distributed but with perfect information.
         """
         base_cost = 1.0
         alpha = 2.0
@@ -197,40 +275,6 @@ class CentralizedScheduler:
         flow_cost = self.flow_data.get(to_node, 0.0)
         
         return base_cost + alpha * jam_cost + beta * flow_cost
-    
-    def _astar_with_obstacles_simple(self, start: int, goal: int, obstacles: set) -> List[int]:
-        """
-        Simple A* avoiding occupied/reserved nodes.
-        
-        This is simplified - real space-time A* would be more complex.
-        The bottleneck is that this runs serially for ALL agents.
-        """
-        if start in obstacles or goal in obstacles:
-            obstacles_copy = obstacles - {start, goal}
-        else:
-            obstacles_copy = obstacles
-        
-        G = self.graph.graph
-        
-        temp_graph = G.copy()
-        for node in obstacles_copy:
-            if node in temp_graph and node != start and node != goal:
-                temp_graph.remove_node(node)
-        
-        if start not in temp_graph or goal not in temp_graph:
-            return []
-        
-        try:
-            path = nx.astar_path(
-                temp_graph,
-                start,
-                goal,
-                heuristic=lambda n1, n2: self._manhattan_distance(n1, n2),
-                weight='weight'
-            )
-            return path
-        except (nx.NetworkXNoPath, nx.NodeNotFound):
-            return []
     
     def _manhattan_distance(self, node1: int, node2: int) -> float:
         """Manhattan distance heuristic."""
@@ -247,4 +291,3 @@ class CentralizedScheduler:
             'total_path_requests': self.metrics['total_requests'],
             'active_path_reservations': self.metrics['active_reservations'],
         }
-

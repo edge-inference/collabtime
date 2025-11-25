@@ -1,0 +1,154 @@
+# Small Scale Experiments (50-100 agents)
+# Validation and baseline tests
+
+experiments:
+  dist_50_agents:
+    name: "Distributed: 50 Agents"
+    description: "Distributed P2P with 50 agents"
+    warehouse:
+      size: [40, 30]
+      storage_regions:
+        - {center: [10, 8], radius: 6}
+        - {center: [30, 22], radius: 6}
+      sortation_regions:
+        - {center: [20, 5], radius: 3}
+        - {center: [20, 25], radius: 3}
+    agents:
+      count: 50
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 3
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 1.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 6
+      use_cython: true
+
+  cent_50_agents:
+    name: "Centralized: 50 Agents"
+    description: "Centralized scheduler with 50 agents"
+    warehouse:
+      size: [40, 30]
+      storage_regions:
+        - {center: [10, 8], radius: 6}
+        - {center: [30, 22], radius: 6}
+      sortation_regions:
+        - {center: [20, 5], radius: 3}
+        - {center: [20, 25], radius: 3}
+    agents:
+      count: 50
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 3
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 1.0
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+  dist_100_agents:
+    name: "Distributed: 100 Agents"
+    description: "Distributed P2P with 100 agents"
+    warehouse:
+      size: [60, 50]
+      storage_regions:
+        - {center: [15, 13], radius: 10}
+        - {center: [45, 38], radius: 10}
+      sortation_regions:
+        - {center: [30, 8], radius: 5}
+        - {center: [30, 42], radius: 5}
+    agents:
+      count: 100
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 3
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 2.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: p2p
+      seed: 42
+      use_spatial_hash: true
+      parallel_gossip: true
+      gossip_workers: 12
+      use_cython: true
+
+  cent_100_agents:
+    name: "Centralized: 100 Agents"
+    description: "Centralized scheduler with 100 agents"
+    warehouse:
+      size: [60, 50]
+      storage_regions:
+        - {center: [15, 13], radius: 10}
+        - {center: [45, 38], radius: 10}
+      sortation_regions:
+        - {center: [30, 8], radius: 5}
+        - {center: [30, 42], radius: 5}
+    agents:
+      count: 100
+      initial_positions: "random"
+    coordination:
+      gossip_interval: 3
+      aoi_threshold: 1000
+      lease_ttl: 30000
+    tasks:
+      arrival_rate: 2.5
+      types: ["pickup", "delivery", "sort"]
+      priorities: [1, 1, 1]
+    simulation:
+      duration: 300
+      step_interval: 50
+      mode: centralized
+      seed: 42
+      use_cython: true
+
+
+metrics:
+  performance:
+    - tasks_completed
+    - tasks_failed
+    - completion_rate
+    - average_completion_time
+    - agent_utilization
+    - total_distance_traveled
+  
+  coordination:
+    - total_reads
+    - total_writes
+    - gossip_messages
+    - aoi_violations
+    - partition_quality
+    - coordination_overhead
+  
+  time_series:
+    - step
+    - cumulative_completions
+    - dsm_reads
+    - dsm_writes
+
+output:
+  directory: "results"
+  plots: ["dashboard_style"]
+  save_time_series: true
