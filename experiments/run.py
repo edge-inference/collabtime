@@ -220,7 +220,7 @@ class ExperimentRunner:
         self.logger.info(f"Warehouse Dimensions: {warehouse_size[0]} × {warehouse_size[1]} = {warehouse_size[0] * warehouse_size[1]} cells")
         self.logger.info(f"Agents: {num_agents}")
         self.logger.info(f"Simulation Duration: {duration}s ({int(duration * 1000 / step_interval)} steps)")
-        self.logger.info(f"Step Duration: {STEP_DURATION_S:.3f}s ({int(STEP_DURATION_S * 1000)}ms)")
+        self.logger.info(f"Step Duration: {step_interval / 1000.0:.3f}s ({step_interval}ms)")
         self.logger.info(f"Timing Mode: {'LF-coordinated' if use_lf else 'Fast-as-possible'}")
         self.logger.info(f"Random Seed: {seed if seed is not None else 'None (unseeded)'}")
         self.logger.info("")
@@ -242,7 +242,7 @@ class ExperimentRunner:
             
             duration = config['simulation']['duration']
             step_interval = config['simulation']['step_interval']
-            step_dt = STEP_DURATION_S
+            step_dt = step_interval / 1000.0  # Convert ms to seconds
             steps = int(duration * 1000 / step_interval)
             seed = config.get('simulation', {}).get('seed', None)
             

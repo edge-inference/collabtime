@@ -28,11 +28,12 @@ class CentralizedScheduler:
     - Runs space-time A* to avoid conflicts
     """
     
-    def __init__(self, warehouse_graph, coordinator, logger=None, 
+    def __init__(self, warehouse_graph, coordinator, model=None, logger=None, 
                  use_cython: bool = True, node_coords: Any = None, graph_csr: Any = None,
-                 service_time_s: float = 0.002):
+                 service_time_s: float = 0.0):
         self.graph = warehouse_graph
         self.coordinator = coordinator
+        self.model = model
         self.logger = logger
         
         self.path_reservations: Dict[int, List[Tuple[int, int]]] = {}
@@ -61,17 +62,17 @@ class CentralizedScheduler:
         
         # We use 1D arrays for the "global" map.
         self.fast_jam_values = np.zeros(num_nodes, dtype=np.float32)
-        self.fast_jam_timestamps = np.zeros(num_nodes, dtype=np.int64)
+        self.fast_jam_timestamps = np.zeros(num_nodes, dtype=np.int32)
         self.fast_flow_values = np.zeros(num_nodes, dtype=np.float32)
-        self.fast_flow_timestamps = np.zeros(num_nodes, dtype=np.int64)
+        self.fast_flow_timestamps = np.zeros(num_nodes, dtype=np.int32)
         
         # Dummy path vals (reservation logic handled separately or TODO: map reservations here)
         self.fast_path_vals = np.zeros((1, 1), dtype=np.int32)
-        self.fast_path_timestamps = np.zeros(1, dtype=np.int64)
+        self.fast_path_timestamps = np.zeros(1, dtype=np.int32)
         
         if self.logger:
             self.logger.info("CentralizedScheduler: Cython-accelerated A* ENABLED (Mandatory)")
-            self.logger.info(f"CentralizedScheduler: Queueing bottleneck enabled (service time: {service_time_s*1000:.1f}ms)")
+            self.logger.info(f"CentralizedScheduler: Sequential pathfinding (no artificial delay)")
         
         self.metrics = {
             'total_requests': 0,
@@ -115,9 +116,6 @@ class CentralizedScheduler:
             queue_wait = time.time() - request_start
             self.metrics['total_queue_wait_time'] += queue_wait
             self.metrics['total_task_assignments'] += 1
-            
-            # Simulate realistic processing time
-            time.sleep(self.service_time_s)
             
             available_tasks = self.coordinator.get_available_tasks()
             if not available_tasks:
@@ -172,7 +170,8 @@ class CentralizedScheduler:
         self.flow_data[node] += flow_value
         # Fast array update
         self.fast_flow_values[node] += flow_value
-        self.fast_flow_timestamps[node] = int(time.time() * 1000)
+        current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
+        self.fast_flow_timestamps[node] = current_time_ms
             
         self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
     
@@ -184,7 +183,8 @@ class CentralizedScheduler:
         
         # Fast array update
         self.fast_jam_values[node] = alpha * jam_value + (1 - alpha) * self.fast_jam_values[node]
-        self.fast_jam_timestamps[node] = int(time.time() * 1000)
+        current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
+        self.fast_jam_timestamps[node] = current_time_ms
             
         self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
     
@@ -201,9 +201,6 @@ class CentralizedScheduler:
             queue_wait = time.time() - request_start
             self.metrics['total_queue_wait_time'] += queue_wait
             self.metrics['total_requests'] += 1
-            
-            # Simulate realistic processing time
-            time.sleep(self.service_time_s)
             
             # occupied_nodes = set(self.agent_positions.values()) # Deprecated for fast A*
             
@@ -235,7 +232,7 @@ class CentralizedScheduler:
     def _astar_fast_centralized(self, start: int, goal: int) -> List[int]:
         """Cython-accelerated A* using global arrays."""
         indptr, indices, _ = self.graph_csr
-        current_time_ms = int(time.time() * 1000)
+        current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
         cost_params = {
             'alpha': 2.0,
             'beta': 0.5,

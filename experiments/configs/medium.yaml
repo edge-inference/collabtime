@@ -184,3 +184,31 @@ experiments:
       mode: centralized
       seed: 42
       use_cython: true
+
+metrics:
+  performance:
+    - tasks_completed
+    - tasks_failed
+    - completion_rate
+    - average_completion_time
+    - agent_utilization
+    - total_distance_traveled
+  
+  coordination:
+    - total_reads
+    - total_writes
+    - gossip_messages
+    - aoi_violations
+    - partition_quality
+    - coordination_overhead
+  
+  time_series:
+    - step
+    - cumulative_completions
+    - dsm_reads
+    - dsm_writes
+
+output:
+  directory: "results"
+  plots: ["dashboard_style"]
+  save_time_series: true

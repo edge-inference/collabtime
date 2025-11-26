@@ -154,8 +154,9 @@ class WarehouseDSMModel(Model):
             self.central_scheduler = CentralizedScheduler(
                 warehouse_graph=self.warehouse,
                 coordinator=self.coordinator,
+                model=self,
                 logger=self.logger,
-                service_time_s=0.002,  # 2ms per request (realistic bottleneck)
+                service_time_s=0.0,  # No artificial delay (pure A* + lock overhead)
                 use_cython=True, # Mandatory
                 node_coords=self.node_coords,
                 graph_csr=self.graph_csr
@@ -288,15 +289,17 @@ class WarehouseDSMModel(Model):
             if self.logger:
                 self.logger.info(f"Parallel gossip ENABLED (workers={gossip_workers})")
 
-        # Agent scheduler: Parallel for realistic multi-agent execution
-        if parallel_agents and self.num_agents >= 50:
+        # Agent scheduler: Parallel for distributed, sequential for centralized
+        if parallel_agents and self.num_agents >= 50 and self.mode != 'centralized':
             self.schedule = ParallelScheduler(self, num_workers=agent_workers)
             if self.logger:
                 workers = self.schedule.num_workers
                 self.logger.info(f"Parallel agent scheduler ENABLED (workers={workers})")
         else:
             self.schedule = RandomActivation(self)
-            if parallel_agents and self.logger:
+            if self.mode == 'centralized' and self.logger:
+                self.logger.info(f"Sequential agent execution (centralized mode bottleneck)")
+            elif parallel_agents and self.logger:
                 self.logger.info(f"Parallel agents disabled (< 50 agents, sequential is faster)")
         
         # Create agents
