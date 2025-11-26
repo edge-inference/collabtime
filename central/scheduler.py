@@ -9,6 +9,7 @@ import networkx as nx
 from collections import defaultdict
 import numpy as np
 import time
+import threading
 
 # Fail Fast: Mandatory Optimization
 try:
@@ -28,7 +29,8 @@ class CentralizedScheduler:
     """
     
     def __init__(self, warehouse_graph, coordinator, logger=None, 
-                 use_cython: bool = True, node_coords: Any = None, graph_csr: Any = None):
+                 use_cython: bool = True, node_coords: Any = None, graph_csr: Any = None,
+                 service_time_s: float = 0.002):
         self.graph = warehouse_graph
         self.coordinator = coordinator
         self.logger = logger
@@ -41,6 +43,10 @@ class CentralizedScheduler:
         # Central congestion data store (perfect, always fresh)
         self.flow_data: Dict[int, float] = defaultdict(float)
         self.jam_data: Dict[int, float] = defaultdict(float)
+        
+        # Queueing bottleneck: centralized scheduler can only handle one request at a time
+        self.lock = threading.Lock()
+        self.service_time_s = service_time_s  # Time to process one request (2ms default)
         
         # Performance optimizations (Mandatory)
         self.use_cython = True
@@ -65,10 +71,13 @@ class CentralizedScheduler:
         
         if self.logger:
             self.logger.info("CentralizedScheduler: Cython-accelerated A* ENABLED (Mandatory)")
+            self.logger.info(f"CentralizedScheduler: Queueing bottleneck enabled (service time: {service_time_s*1000:.1f}ms)")
         
         self.metrics = {
             'total_requests': 0,
+            'total_task_assignments': 0,
             'total_computation_time': 0,
+            'total_queue_wait_time': 0,
             'active_reservations': 0,
             'congestion_data_size': 0
         }
@@ -97,10 +106,22 @@ class CentralizedScheduler:
         PUSH model: Central scheduler assigns best task to agent.
         Assignment is ATOMIC - scheduler claims task on behalf of agent.
         Returns (task_id, task_location) or None.
+        
+        BOTTLENECK: Serialized through lock - only one agent can request at a time.
         """
-        available_tasks = self.coordinator.get_available_tasks()
-        if not available_tasks:
-            return None
+        request_start = time.time()
+        
+        with self.lock:  # Queue bottleneck: agents wait in line
+            queue_wait = time.time() - request_start
+            self.metrics['total_queue_wait_time'] += queue_wait
+            self.metrics['total_task_assignments'] += 1
+            
+            # Simulate realistic processing time
+            time.sleep(self.service_time_s)
+            
+            available_tasks = self.coordinator.get_available_tasks()
+            if not available_tasks:
+                return None
         
         # Get both assigned locations and task_ids to prevent duplicates
         assigned_locations = set(loc for _, loc in self.agent_task_assignments.values())
@@ -133,18 +154,18 @@ class CentralizedScheduler:
             if distance < best_distance:
                 best_distance = distance
                 best_task = (task.task_id, task.location)
-        
-        if best_task:
-            task_id, task_location = best_task
-            claim_success = self.coordinator.try_claim(task_id, agent_id, ttl_ms=300000)
-            if claim_success:
-                self.agent_task_assignments[agent_id] = (task_id, task_location)
-                self.assigned_task_ids.add(task_id)
-                return best_task
-            else:
-                return None
-        
-        return None
+            
+            if best_task:
+                task_id, task_location = best_task
+                claim_success = self.coordinator.try_claim(task_id, agent_id, ttl_ms=300000)
+                if claim_success:
+                    self.agent_task_assignments[agent_id] = (task_id, task_location)
+                    self.assigned_task_ids.add(task_id)
+                    return best_task
+                else:
+                    return None
+            
+            return None
     
     def report_flow(self, node: int, flow_value: float = 1.0):
         """Agent reports edge usage (perfect, instant update)."""
@@ -172,30 +193,38 @@ class CentralizedScheduler:
         Central pathfinding request (BLOCKING) with congestion awareness.
         
         Uses perfect, fresh congestion data (no staleness like distributed).
-        This is the bottleneck: all agents wait in line for the scheduler.
+        BOTTLENECK: Serialized through lock - agents wait in line for pathfinding.
         """
-        self.metrics['total_requests'] += 1
+        request_start = time.time()
         
-        # occupied_nodes = set(self.agent_positions.values()) # Deprecated for fast A*
-        
-        try:
-            if start == goal:
-                return [start]
+        with self.lock:  # Queue bottleneck: agents wait in line
+            queue_wait = time.time() - request_start
+            self.metrics['total_queue_wait_time'] += queue_wait
+            self.metrics['total_requests'] += 1
             
-            # Optimized Pathfinding (Mandatory)
-            path = self._astar_fast_centralized(start, goal)
+            # Simulate realistic processing time
+            time.sleep(self.service_time_s)
             
-            if path:
-                self.path_reservations[agent_id] = path[:min(3, len(path))]
-                self.metrics['active_reservations'] = len(self.path_reservations)
-                return path
-            else:
-                return []
+            # occupied_nodes = set(self.agent_positions.values()) # Deprecated for fast A*
+            
+            try:
+                if start == goal:
+                    return [start]
+                    
+                # Optimized Pathfinding (Mandatory)
+                path = self._astar_fast_centralized(start, goal)
                 
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"Central scheduler pathfinding failed: {e}")
-            return []
+                if path:
+                    self.path_reservations[agent_id] = path[:min(3, len(path))]
+                    self.metrics['active_reservations'] = len(self.path_reservations)
+                    return path
+                else:
+                    return []
+                    
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"Central scheduler pathfinding failed: {e}")
+                return []
     
     def release_path(self, agent_id: int):
         """Agent releases its path reservation when done."""
@@ -287,7 +316,16 @@ class CentralizedScheduler:
     
     def get_metrics(self) -> Dict:
         """Return scheduler performance metrics."""
+        total_operations = self.metrics['total_requests'] + self.metrics['total_task_assignments']
+        avg_queue_wait = 0
+        if total_operations > 0:
+            avg_queue_wait = self.metrics['total_queue_wait_time'] / total_operations
+        
         return {
             'total_path_requests': self.metrics['total_requests'],
+            'total_task_assignments': self.metrics['total_task_assignments'],
+            'total_scheduler_operations': total_operations,
             'active_path_reservations': self.metrics['active_reservations'],
+            'total_queue_wait_time_s': self.metrics['total_queue_wait_time'],
+            'avg_queue_wait_time_ms': avg_queue_wait * 1000,
         }

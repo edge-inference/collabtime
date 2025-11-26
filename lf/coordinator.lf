@@ -14,7 +14,7 @@ preamble {=
 
 reactor TickGenerator(
     port = 9001,
-    tick_period = 50 msec
+    tick_period = 200 msec
 ) {
     state server_socket
     state client_sockets = []
@@ -97,7 +97,7 @@ reactor TickGenerator(
 main reactor {
     tick_gen = new TickGenerator(
         port=9001,
-        tick_period = 50 msec
+        tick_period = 200 msec
     )
 }
 

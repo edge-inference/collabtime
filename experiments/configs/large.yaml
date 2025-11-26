@@ -26,12 +26,14 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: p2p
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 28
+      gossip_workers: 8
+      parallel_agents: true
+      agent_workers: 16
       use_cython: true
 
   centralized_600_agents:
@@ -58,7 +60,7 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: centralized
       seed: 42
       use_cython: true
@@ -87,12 +89,14 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: p2p
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 32
+      gossip_workers: 8
+      parallel_agents: true
+      agent_workers: 16
       use_cython: true
 
   centralized_700_agents:
@@ -119,7 +123,7 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: centralized
       seed: 42
       use_cython: true
@@ -148,12 +152,12 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: p2p
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 36
+      gossip_workers: 10
       use_cython: true
 
   centralized_800_agents:
@@ -180,7 +184,7 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: centralized
       seed: 42
       use_cython: true
@@ -209,12 +213,12 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: p2p
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 40
+      gossip_workers: 10
       use_cython: true
 
   centralized_900_agents:
@@ -241,7 +245,7 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: centralized
       seed: 42
       use_cython: true
@@ -270,12 +274,12 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: p2p
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 48
+      gossip_workers: 12
       use_cython: true
 
   centralized_1000_agents:
@@ -302,7 +306,7 @@ experiments:
       priorities: [1, 1, 1]
     simulation:
       duration: 300
-      step_interval: 50
+      step_interval: 200
       mode: centralized
       seed: 42
       use_cython: true

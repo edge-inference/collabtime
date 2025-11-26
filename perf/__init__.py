@@ -4,6 +4,7 @@ Performance optimization utilities.
 
 from .spatial_hash import SpatialHash
 from .parallel_gossip import ParallelGossipEngine
+from .parallel_scheduler import ParallelScheduler
 
 try:
     from .astar_fast import astar_fast
@@ -14,5 +15,5 @@ except ImportError:
     astar_fast = None
     merge_bidirectional_fast = None
 
-__all__ = ['SpatialHash', 'ParallelGossipEngine', 'astar_fast', 'merge_bidirectional_fast', 'CYTHON_AVAILABLE']
+__all__ = ['SpatialHash', 'ParallelGossipEngine', 'ParallelScheduler', 'astar_fast', 'merge_bidirectional_fast', 'CYTHON_AVAILABLE']
 

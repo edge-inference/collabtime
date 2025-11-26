@@ -259,6 +259,8 @@ class ExperimentRunner:
                 use_spatial_hash=config['simulation'].get('use_spatial_hash', False),
                 parallel_gossip=config['simulation'].get('parallel_gossip', False),
                 gossip_workers=config['simulation'].get('gossip_workers', 4),
+                parallel_agents=config['simulation'].get('parallel_agents', True),
+                agent_workers=config['simulation'].get('agent_workers', None),
                 use_cython=config['simulation'].get('use_cython', True),
                 seed=seed,
                 logger=self.logger
@@ -316,10 +318,6 @@ class ExperimentRunner:
             # Collect final metrics
             final_metrics = collect_final_metrics(model, metrics_data, sim_duration_s=duration, step_interval_ms=step_interval)
             
-            # Cleanup shared memory explicitly
-            if hasattr(model, 'cleanup_shm'):
-                model.cleanup_shm()
-            
             end_time = datetime.now()
             duration_seconds = (end_time - start_time).total_seconds()
             
@@ -360,6 +358,11 @@ class ExperimentRunner:
             self.logger.error(f"Failed experiment: {config_name} - {e}\n{full_trace}")
             return result
         finally:
+            if 'model' in locals():
+                if hasattr(model, 'gossip_engine') and model.gossip_engine:
+                    model.gossip_engine.stop()
+                if hasattr(model, 'cleanup_shm'):
+                    model.cleanup_shm()
             self.logger.removeHandler(mode_file_handler)
             mode_file_handler.close()
     

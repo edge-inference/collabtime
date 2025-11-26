@@ -44,7 +44,7 @@ from config import LOG_INTERVAL_STEPS, TASK_SPAWN_LOG_INTERVAL_STEPS
 
 # Performance Optimizations (Mandatory - Fail Fast)
 try:
-    from perf import SpatialHash, ParallelGossipEngine
+    from perf import SpatialHash, ParallelGossipEngine, ParallelScheduler
 except ImportError as e:
     raise RuntimeError(f"CRITICAL: Performance modules (Cython/SharedMemory) missing. Simulation cannot run at scale. {e}")
 
@@ -76,6 +76,8 @@ class WarehouseDSMModel(Model):
                  use_spatial_hash: bool = False,
                  parallel_gossip: bool = False,
                  gossip_workers: int = 4,
+                 parallel_agents: bool = True,
+                 agent_workers: int = None,
                  use_cython: bool = True,
                  logger=None):
         
@@ -153,6 +155,7 @@ class WarehouseDSMModel(Model):
                 warehouse_graph=self.warehouse,
                 coordinator=self.coordinator,
                 logger=self.logger,
+                service_time_s=0.002,  # 2ms per request (realistic bottleneck)
                 use_cython=True, # Mandatory
                 node_coords=self.node_coords,
                 graph_csr=self.graph_csr
@@ -285,8 +288,16 @@ class WarehouseDSMModel(Model):
             if self.logger:
                 self.logger.info(f"Parallel gossip ENABLED (workers={gossip_workers})")
 
-        # Agent scheduler
-        self.schedule = RandomActivation(self)
+        # Agent scheduler: Parallel for realistic multi-agent execution
+        if parallel_agents and self.num_agents >= 50:
+            self.schedule = ParallelScheduler(self, num_workers=agent_workers)
+            if self.logger:
+                workers = self.schedule.num_workers
+                self.logger.info(f"Parallel agent scheduler ENABLED (workers={workers})")
+        else:
+            self.schedule = RandomActivation(self)
+            if parallel_agents and self.logger:
+                self.logger.info(f"Parallel agents disabled (< 50 agents, sequential is faster)")
         
         # Create agents
         self._create_agents(agent_positions)
@@ -325,7 +336,14 @@ class WarehouseDSMModel(Model):
     
     def cleanup_shm(self):
         """Explicitly cleanup shared memory to prevent leaks"""
-        # Stop parallel gossip engine first (closes worker pool)
+        # Stop parallel agent scheduler first
+        if hasattr(self, 'schedule') and hasattr(self.schedule, 'stop'):
+            try:
+                self.schedule.stop()
+            except Exception:
+                pass
+        
+        # Stop parallel gossip engine (closes worker pool)
         if hasattr(self, 'gossip_engine') and self.gossip_engine:
             try:
                 self.gossip_engine.stop()
