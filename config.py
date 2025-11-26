@@ -5,7 +5,7 @@ Single source of truth for simulation timing and constants.
 """
 
 # Lingua Franca timing
-LF_TICK_DURATION_MS = 50
+LF_TICK_DURATION_MS = 100
 STEP_DURATION_S = LF_TICK_DURATION_MS / 1000.0
 
 # Metrics calculation windows

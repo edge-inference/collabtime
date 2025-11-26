@@ -547,12 +547,17 @@ def start_lf_coordinator():
         return None
     
     print("Starting LF coordinator...")
+    # Redirect output to log file to prevent pipe buffer overflow on long runs
+    log_file = lf_dir / 'coordinator.log'
+    log_fd = open(log_file, 'w')
     proc = subprocess.Popen(
         [sys.executable, str(coordinator_script)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=log_fd,
+        stderr=subprocess.STDOUT,  # Merge stderr into stdout
         cwd=str(lf_dir)
     )
+    # Store file descriptor for cleanup later
+    proc._log_fd = log_fd
     
     # Wait a bit for server to start
     time.sleep(2)
@@ -568,6 +573,8 @@ def start_lf_coordinator():
         print("Stopping LF coordinator...")
         proc.terminate()
         proc.wait(timeout=5)
+        if hasattr(proc, '_log_fd'):
+            proc._log_fd.close()
     
     atexit.register(cleanup)
     
