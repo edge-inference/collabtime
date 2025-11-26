@@ -16,7 +16,7 @@ from typing import Iterator, Optional
 class LFTickClient:
     """Connects to an LF tick server and yields tick timestamps (ms)."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 9001, timeout_s: float = 5.0):
+    def __init__(self, host: str = "127.0.0.1", port: int = 9001, timeout_s: float = 120.0):
         self.host = host
         self.port = port
         self.timeout_s = timeout_s

@@ -528,7 +528,11 @@ class ExperimentRunner:
                 
                 result = self.run_single_experiment(exp_name, config, use_lf=use_lf, seed_override=seed)
                 results.append(result)
+                
+                # Save incrementally after each experiment so results aren't lost if batch fails
+                self.save_results(results)
         
+        # Final save with all results
         self.save_results(results)
         self.file_handler.mark_run_complete()
         
