@@ -43,6 +43,7 @@ from lf.bridge import LFTickClient
 from experiments.metrics import collect_step_metrics, collect_final_metrics
 from experiments.plotting import generate_dashboard_reports
 from experiments.batch_utils import generate_batch_experiment_list
+from experiments.cleanup_utils import cleanup_duplicate_plots
 
 
 @dataclass
@@ -391,9 +392,15 @@ class ExperimentRunner:
                         agent.failed = False
                         self.logger.info(f"Agent {agent_id} recovered at time {current_time}s")
     
-    def save_results(self, results: List[ExperimentResult]):
+    def save_results(self, results: List[ExperimentResult], is_incremental: bool = False):
         """Save experiment results to various formats, grouped by mode into subfolders."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Store timestamp for cleanup if this is incremental save
+        if is_incremental:
+            if not hasattr(self, '_incremental_timestamps'):
+                self._incremental_timestamps = []
+            self._incremental_timestamps.append(timestamp)
         # Group results by mode
         by_mode: Dict[str, List[ExperimentResult]] = {'distributed': [], 'centralized': [], 'unknown': []}
         for r in results:
@@ -530,10 +537,11 @@ class ExperimentRunner:
                 results.append(result)
                 
                 # Save incrementally after each experiment so results aren't lost if batch fails
-                self.save_results(results)
+                self.save_results(results, is_incremental=True)
         
-        # Final save with all results
-        self.save_results(results)
+        self.save_results(results, is_incremental=False)
+        if hasattr(self, '_incremental_timestamps') and self._incremental_timestamps:
+            cleanup_duplicate_plots(self.file_handler.run_dir, self.logger)
         self.file_handler.mark_run_complete()
         
         return results
