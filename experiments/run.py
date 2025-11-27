@@ -541,7 +541,7 @@ class ExperimentRunner:
         
         self.save_results(results, is_incremental=False)
         if hasattr(self, '_incremental_timestamps') and self._incremental_timestamps:
-            cleanup_duplicate_plots(self.file_handler.run_dir, self.logger)
+            cleanup_duplicate_plots(self.file_handler.current_run_dir, self.logger)
         self.file_handler.mark_run_complete()
         
         return results

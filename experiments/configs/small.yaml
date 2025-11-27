@@ -25,7 +25,7 @@ experiments:
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
-      duration: 300
+      duration: 900
       step_interval: 100
       mode: p2p
       seed: 42
@@ -57,7 +57,7 @@ experiments:
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
-      duration: 300
+      duration: 900
       step_interval: 100
       mode: centralized
       seed: 42
@@ -86,7 +86,7 @@ experiments:
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
-      duration: 300
+      duration: 900
       step_interval: 100
       mode: p2p
       seed: 42
@@ -118,7 +118,7 @@ experiments:
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
-      duration: 300
+      duration: 900
       step_interval: 100
       mode: centralized
       seed: 42
