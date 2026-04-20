@@ -11,31 +11,88 @@ from world.model import WarehouseDSMModel
 def collect_step_metrics(model: WarehouseDSMModel, step: int) -> Dict:
     """Collect metrics for a single simulation step."""
     current_time_ms = int(model.step_count * model.step_duration_s * 1000)
-    cache_stats_per_agent = [
-        agent.local_cache.get_stats(current_time_ms) if agent.local_cache else {}
-        for agent in model.schedule.agents
-    ]
+    cache_stats_per_agent = []
+    for agent in model.schedule.agents:
+        try:
+            if agent.local_cache:
+                stats = agent.local_cache.get_stats(current_time_ms)
+                cache_stats_per_agent.append(stats)
+            else:
+                cache_stats_per_agent.append({})
+        except Exception as e:
+            if model.logger:
+                model.logger.warning(f"Failed to get cache stats from agent {agent.unique_id}: {e}")
+            cache_stats_per_agent.append({})
     
-    total_cache_entries = sum(
-        stats.get('flow_entries', 0) + stats.get('jam_entries', 0) + 
-        stats.get('agent_locations', 0) + stats.get('path_intents', 0) + 
-        stats.get('resource_states', 0)
-        for stats in cache_stats_per_agent
-    )
-    
-    total_jam_entries = sum(stats.get('jam_entries', 0) for stats in cache_stats_per_agent)
+    if model.mode == 'centralized' and model.central_scheduler:
+        try:
+            # Use comparable get_stats() method for fair comparison with distributed
+            central_stats = model.central_scheduler.get_stats()
+            total_cache_entries = sum(central_stats.values())
+            total_jam_entries = central_stats.get('jam_entries', 0)
+            
+            if step % 100 == 0 and model.logger:
+                stuck_agents = sum(1 for a in model.schedule.agents if a.stuck_counter > 0)
+                max_stuck = max((a.stuck_counter for a in model.schedule.agents), default=0)
+                model.logger.debug(f"Step {step}: Central scheduler stats: {central_stats}. Stuck: {stuck_agents} (Max: {max_stuck})")
+        except Exception as e:
+            if model.logger:
+                model.logger.warning(f"Failed to read central scheduler data: {e}")
+            total_cache_entries = 0
+            total_jam_entries = 0
+    else:
+        total_cache_entries = sum(
+            stats.get('flow_entries', 0) + stats.get('jam_entries', 0) + 
+            stats.get('agent_locations', 0) + stats.get('path_intents', 0) + 
+            stats.get('resource_states', 0)
+            for stats in cache_stats_per_agent
+        )
+        total_jam_entries = sum(stats.get('jam_entries', 0) for stats in cache_stats_per_agent)
     
     unique_jams = {}
     if model.mode == 'centralized' and model.central_scheduler:
-        for node_id, jam_value in model.central_scheduler.jam_data.items():
-            unique_jams[node_id] = {'value': jam_value, 'timestamp': step}
-        num_jammed_nodes = len(unique_jams)
-        total_jam = sum(j['value'] for j in unique_jams.values())
-        avg_jam_intensity = total_jam / num_jammed_nodes if num_jammed_nodes > 0 else 0.0
+        try:
+            # Thread-safe copy if possible, or just iterate (assuming lock handled inside scheduler or accepting risk)
+            # Better: access via a method or property that returns a copy, but direct access is what we have.
+            # We can try to acquire the lock if it exists
+            if hasattr(model.central_scheduler, 'data_lock'):
+                 with model.central_scheduler.data_lock:
+                    jam_items = list(model.central_scheduler.jam_data.items())
+            else:
+                 jam_items = list(model.central_scheduler.jam_data.items())
+
+            for node_id, jam_value in jam_items:
+                if jam_value > 0.01:
+                    unique_jams[node_id] = {'value': jam_value, 'timestamp': current_time_ms}
+        except Exception as e:
+            if model.logger:
+                model.logger.warning(f"Failed to collect jam data from central scheduler: {e}")
     else:
-        total_jam = sum(agent.local_cache.get_jam_intensity() for agent in model.schedule.agents if agent.local_cache)
-        num_jammed_nodes = sum(1 for agent in model.schedule.agents if agent.local_cache and agent.local_cache.get_jam_intensity() > 0)
-        avg_jam_intensity = total_jam / num_jammed_nodes if num_jammed_nodes > 0 else 0.0
+        aoi_threshold_ms = model.aoi_threshold_ms
+        for agent in model.schedule.agents:
+            if not agent.local_cache:
+                continue
+            try:
+                jam_vals = np.asarray(agent.local_cache.jam_values)
+                jam_ts = np.asarray(agent.local_cache.jam_timestamps)
+                
+                valid_mask = (current_time_ms - jam_ts) <= aoi_threshold_ms
+                nonzero_mask = jam_vals > 0.01
+                combined_mask = valid_mask & nonzero_mask
+                
+                for node_id in np.where(combined_mask)[0]:
+                    timestamp = int(jam_ts[node_id])
+                    jam_value = float(jam_vals[node_id])
+                    if node_id not in unique_jams or jam_value > unique_jams[node_id]['value']:
+                        unique_jams[node_id] = {'value': jam_value, 'timestamp': timestamp}
+            except Exception as e:
+                if model.logger:
+                    model.logger.warning(f"Failed to read jam data from agent {agent.unique_id}: {e}")
+                continue
+    
+    num_jammed_nodes = len(unique_jams)
+    total_jam = sum(j['value'] for j in unique_jams.values())
+    avg_jam_intensity = total_jam / num_jammed_nodes if num_jammed_nodes > 0 else 0.0
     
     agent_states = [agent.state for agent in model.schedule.agents]
     working_count = sum(1 for state in agent_states if state.value == 'working')
@@ -121,9 +178,21 @@ def collect_final_metrics(model: WarehouseDSMModel, step_data: List[Dict], sim_d
         'agent_utilization': np.mean([agent.utilization for agent in model.schedule.agents])
     }
     
+    num_agents = len(model.schedule.agents)
+    
     if model.mode == 'centralized':
-        avg_cache_size = model.central_scheduler.metrics['congestion_data_size'] if model.central_scheduler else 0
+        # Use get_stats() for comparable measurement with distributed
+        if model.central_scheduler:
+            central_stats = model.central_scheduler.get_stats()
+            avg_cache_size = sum(central_stats.values())
+            total_scheduler_requests = (model.central_scheduler.metrics['total_requests'] + 
+                                        model.central_scheduler.metrics['total_task_assignments'])
+        else:
+            avg_cache_size = 0
+            total_scheduler_requests = 0
         total_gossip_rounds = 0
+        total_peer_exchanges = 0
+        comm_operations = total_scheduler_requests
     else:
         current_time_ms = int(model.step_count * model.step_duration_s * 1000)
         avg_cache_size = np.mean([
@@ -131,10 +200,26 @@ def collect_final_metrics(model: WarehouseDSMModel, step_data: List[Dict], sim_d
             for agent in model.schedule.agents
         ])
         total_gossip_rounds = df['gossip_rounds'].max() if 'gossip_rounds' in df else 0
+        
+        # Compute actual peer exchanges: each round pairs N/2 agents for bidirectional merge
+        if hasattr(model, 'gossip_engine') and model.gossip_engine:
+            total_peer_exchanges = model.gossip_engine.total_merges
+        else:
+            total_peer_exchanges = total_gossip_rounds * (num_agents // 2)
+        
+        total_scheduler_requests = 0
+        comm_operations = total_peer_exchanges
+    
+    tasks_completed = len(model.completed_tasks)
+    comms_per_task = comm_operations / tasks_completed if tasks_completed > 0 else 0.0
     
     coordination_metrics = {
         'avg_cache_size': float(avg_cache_size),
         'total_gossip_rounds': int(total_gossip_rounds),
+        'total_peer_exchanges': int(total_peer_exchanges),
+        'total_scheduler_requests': int(total_scheduler_requests),
+        'comm_operations': int(comm_operations),
+        'comms_per_task': float(comms_per_task),
         'tasks_in_registry': len(model.coordinator.task_registry.tasks),
         'active_leases': len([l for l in model.coordinator.lease_manager.leases.values() if l]),
         'coordination_mode': model.mode

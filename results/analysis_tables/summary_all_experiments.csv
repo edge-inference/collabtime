@@ -1,0 +1,17 @@
+Config,Mode,Run,Seed,Tasks Completed,Completion Rate (%),Throughput (tps),Avg Latency (s),P90 Latency (s),Robot Utilization (%),Total Distance
+dist_50_agents,distributed,run001,42,725,79.85,0.81,121.71,230.24,74.58,5797
+dist_100_agents,distributed,run001,42,1376,84.52,1.53,126.10,237.45,70.83,13279
+cent_50_agents,centralized,run001,42,751,82.71,0.83,119.57,199.20,77.37,3772
+cent_100_agents,centralized,run001,42,1415,86.92,1.57,125.04,199.12,73.17,9191
+scalability_500_agents,distributed,run002,42,3972,87.07,4.41,129.51,245.35,41.56,128758
+scalability_200_agents,distributed,run002,42,2462,88.59,2.74,120.74,229.68,63.58,32467
+scalability_300_agents,distributed,run002,42,3246,89.64,3.61,120.56,228.90,55.74,58237
+centralized_500_agents,centralized,run002,42,3249,71.80,3.61,215.31,406.76,34.29,112094
+centralized_200_agents,centralized,run002,42,2461,88.56,2.73,123.05,213.70,63.75,25108
+centralized_300_agents,centralized,run002,42,2873,79.34,3.19,138.97,240.38,50.07,51968
+scalability_800_agents,distributed,run003,42,4892,83.44,5.44,143.98,282.19,32.57,240439
+scalability_600_agents,distributed,run003,42,4342,87.97,4.82,138.29,264.29,37.40,164439
+scalability_700_agents,distributed,run003,42,4742,85.73,5.27,137.20,268.70,35.38,200855
+centralized_700_agents,centralized,run003,42,3338,60.37,3.71,251.33,447.11,24.45,176190
+centralized_600_agents,centralized,run003,42,3367,68.41,3.74,237.25,452.94,29.62,141708
+centralized_800_agents,centralized,run003,42,2950,50.34,3.28,282.08,505.32,19.78,211661

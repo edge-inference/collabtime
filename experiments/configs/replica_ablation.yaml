@@ -1,0 +1,178 @@
+# Replica Ablation Study
+# Fixed warehouse: 120 x 100, Fixed λ = 5.0 tasks/s
+# Tests: How many centralized replicas are needed at different fleet sizes?
+# Includes P2P baseline for comparison
+
+experiments:
+  # === 100 ROBOTS ===
+  replica_p2p_100:
+    name: "P2P Baseline: 100 Robots"
+    warehouse: &warehouse_fixed
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: &tasks_fixed {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 12, use_cython: true}
+
+  replica_cent_100_r1:
+    name: "Centralized 1 Replica: 100 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 1, seed: 42, use_cython: true}
+
+  replica_cent_100_r5:
+    name: "Centralized 5 Replicas: 100 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 5, seed: 42, use_cython: true}
+
+  replica_cent_100_r10:
+    name: "Centralized 10 Replicas: 100 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  replica_cent_100_r25:
+    name: "Centralized 25 Replicas: 100 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 25, seed: 42, use_cython: true}
+
+  replica_cent_100_r50:
+    name: "Centralized 50 Replicas: 100 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 50, seed: 42, use_cython: true}
+
+  # === 500 ROBOTS ===
+  replica_p2p_500:
+    name: "P2P Baseline: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 24, use_cython: true}
+
+  replica_cent_500_r1:
+    name: "Centralized 1 Replica: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 1, seed: 42, use_cython: true}
+
+  replica_cent_500_r5:
+    name: "Centralized 5 Replicas: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 5, seed: 42, use_cython: true}
+
+  replica_cent_500_r10:
+    name: "Centralized 10 Replicas: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  replica_cent_500_r25:
+    name: "Centralized 25 Replicas: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 25, seed: 42, use_cython: true}
+
+  replica_cent_500_r50:
+    name: "Centralized 50 Replicas: 500 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 50, seed: 42, use_cython: true}
+
+  # === 1000 ROBOTS ===
+  replica_p2p_1000:
+    name: "P2P Baseline: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 12, use_cython: true}
+
+  replica_cent_1000_r1:
+    name: "Centralized 1 Replica: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 1, seed: 42, use_cython: true}
+
+  replica_cent_1000_r5:
+    name: "Centralized 5 Replicas: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 5, seed: 42, use_cython: true}
+
+  replica_cent_1000_r10:
+    name: "Centralized 10 Replicas: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  replica_cent_1000_r25:
+    name: "Centralized 25 Replicas: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 25, seed: 42, use_cython: true}
+
+  replica_cent_1000_r50:
+    name: "Centralized 50 Replicas: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 50, seed: 42, use_cython: true}
+
+  replica_cent_1000_r100:
+    name: "Centralized 100 Replicas: 1000 Robots"
+    warehouse: *warehouse_fixed
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: *tasks_fixed
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 100, seed: 42, use_cython: true}
+
+metrics:
+  performance: [tasks_completed, tasks_failed, completion_rate, average_completion_time, agent_utilization, total_distance_traveled]
+  coordination: [total_reads, total_writes, gossip_messages, aoi_violations, partition_quality, coordination_overhead]
+  time_series: [step, cumulative_completions, dsm_reads, dsm_writes]
+
+output:
+  directory: "results"
+  plots: ["dashboard_style"]
+  save_time_series: true
+

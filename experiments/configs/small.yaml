@@ -60,6 +60,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 
@@ -67,13 +68,13 @@ experiments:
     name: "Distributed: 100 Agents"
     description: "Distributed P2P with 100 agents"
     warehouse:
-      size: [60, 50]
+      size: [55, 40]
       storage_regions:
-        - {center: [15, 13], radius: 10}
-        - {center: [45, 38], radius: 10}
+        - {center: [14, 10], radius: 8}
+        - {center: [41, 30], radius: 8}
       sortation_regions:
-        - {center: [30, 8], radius: 5}
-        - {center: [30, 42], radius: 5}
+        - {center: [27, 6], radius: 4}
+        - {center: [27, 34], radius: 4}
     agents:
       count: 100
       initial_positions: "random"
@@ -82,7 +83,7 @@ experiments:
       aoi_threshold: 1000
       lease_ttl: 30000
     tasks:
-      arrival_rate: 2.5
+      arrival_rate: 1.75
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
@@ -92,20 +93,20 @@ experiments:
       seed: 42
       use_spatial_hash: true
       parallel_gossip: true
-      gossip_workers: 12
+      gossip_workers: 10
       use_cython: true
 
   cent_100_agents:
     name: "Centralized: 100 Agents"
     description: "Centralized scheduler with 100 agents"
     warehouse:
-      size: [60, 50]
+      size: [55, 40]
       storage_regions:
-        - {center: [15, 13], radius: 10}
-        - {center: [45, 38], radius: 10}
+        - {center: [14, 10], radius: 8}
+        - {center: [41, 30], radius: 8}
       sortation_regions:
-        - {center: [30, 8], radius: 5}
-        - {center: [30, 42], radius: 5}
+        - {center: [27, 6], radius: 4}
+        - {center: [27, 34], radius: 4}
     agents:
       count: 100
       initial_positions: "random"
@@ -114,13 +115,14 @@ experiments:
       aoi_threshold: 1000
       lease_ttl: 30000
     tasks:
-      arrival_rate: 2.5
+      arrival_rate: 1.75
       types: ["pickup", "delivery", "sort"]
       priorities: [1, 1, 1]
     simulation:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 

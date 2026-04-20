@@ -46,8 +46,11 @@ Thumbs.db
 ########################################
 
 # Experiment outputs
-results/
-**/results/
+# results/ is tracked (figures, summaries, run manifests) via Git LFS for images.
+# Only the heavyweight per-run verbose logs are excluded.
+results/**/*.log
+**/experiment.log
+**/overnight_run_*.log
 
 # Mesa / Solara visualization
 .solara/
@@ -93,3 +96,4 @@ notes/myls_template/__MACOSX/
 backup/
 .cursor/
 .cursorrules
+.cursor

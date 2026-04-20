@@ -1,0 +1,2 @@
+config_name,seed,tasks_completed,tasks_failed,completion_rate,avg_latency_s,p50_latency_s,p90_latency_s,p99_latency_s,throughput_tps
+scalability_1000_agents,42,5810,0,0.8542861343920012,150.461669535284,110.19999999999999,295.0,548.473,6.455555555555556

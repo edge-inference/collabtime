@@ -355,6 +355,10 @@ class RobotAgent(mesa.Agent):
             self.path.pop(0)
             self.movement_timer = MOVEMENT_DURATION_STEPS
             self.stuck_counter = 0
+            
+            # Update central scheduler with new position (centralized mode)
+            if self.model.mode == 'centralized' and self.model.central_scheduler:
+                self.model.central_scheduler.update_agent_position(self.unique_id, self.node)
         else:
             self.stuck_counter += 1
             
@@ -422,15 +426,16 @@ class RobotAgent(mesa.Agent):
         if not self.model.warehouse.is_adjacent(self.node, node):
             return False
         
-        # Centralized: trust the scheduler, always allow
+        capacity = self.model.warehouse.get_node_capacity(node)
+        
         if self.model.mode == 'centralized':
-            capacity = self.model.warehouse.get_node_capacity(node)
-            return capacity > 0
+            # Central scheduler has perfect global knowledge of agent positions
+            occupancy = sum(1 for pos in self.model.central_scheduler.agent_positions.values() if pos == node)
+            return occupancy < capacity
         
         # Distributed: check capacity using cached agent locations (may be stale!)
         current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
         agents_at_node = self.local_cache.read_agents_at_node(node, max_aoi_ms=MAX_AOI_MS, current_time_ms=current_time_ms)
-        capacity = self.model.warehouse.get_node_capacity(node)
         return agents_at_node < capacity
     
     def _calculate_distance(self, from_node: int, to_node: int) -> float:
@@ -583,36 +588,36 @@ class RobotAgent(mesa.Agent):
     def _write_flow_trace(self, from_node: int, to_node: int):
         """Write flow trace for congestion tracking"""
         if self.model.mode == 'centralized':
-            # Report to central scheduler (perfect, instant)
             try:
                 self.model.central_scheduler.report_flow(to_node, 1.0)
-            except Exception:
-                pass
+            except Exception as e:
+                if hasattr(self.model, 'logger') and self.model.logger:
+                    self.model.logger.warning(f"Agent {self.unique_id}: Failed to report flow to central scheduler: {e}")
         elif self.local_cache:
-            # Distributed: write to local cache (eventual consistency via gossip)
             try:
                 current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
                 self.local_cache.write_flow(to_node, 1.0, current_time_ms)
-            except Exception:
-                pass
+            except Exception as e:
+                if hasattr(self.model, 'logger') and self.model.logger:
+                    self.model.logger.warning(f"Agent {self.unique_id}: Failed to write flow to local cache: {e}")
     
     def _write_jam_signal(self):
         """Write jam signal when stuck"""
         jam_value = min(5.0, self.stuck_counter / 50.0)
         
         if self.model.mode == 'centralized':
-            # Report to central scheduler (perfect, instant)
             try:
                 self.model.central_scheduler.report_jam(self.node, jam_value)
-            except Exception:
-                pass
+            except Exception as e:
+                if hasattr(self.model, 'logger') and self.model.logger:
+                    self.model.logger.warning(f"Agent {self.unique_id}: Failed to report jam to central scheduler: {e}")
         elif self.local_cache:
-            # Distributed: write to local cache (eventual consistency via gossip)
             try:
                 current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000)
                 self.local_cache.write_jam(self.node, jam_value, current_time_ms)
-            except Exception:
-                pass
+            except Exception as e:
+                if hasattr(self.model, 'logger') and self.model.logger:
+                    self.model.logger.warning(f"Agent {self.unique_id}: Failed to write jam to local cache: {e}")
     
     def _try_lateral_escape(self) -> bool:
         """Try a one-step lateral move to de-queue if blocked.
@@ -648,6 +653,11 @@ class RobotAgent(mesa.Agent):
                 self._write_flow_trace(self.node, next_nb)
                 self.node = next_nb
                 self.movement_timer = LATERAL_MOVE_DURATION_STEPS
+                
+                # Update central scheduler with new position (centralized mode)
+                if self.model.mode == 'centralized' and self.model.central_scheduler:
+                    self.model.central_scheduler.update_agent_position(self.unique_id, self.node)
+                
                 return True
             return False
         except Exception:
@@ -685,6 +695,10 @@ class RobotAgent(mesa.Agent):
                     self.node = next_node
                     self.path.pop(0)
                     self.movement_timer = MOVEMENT_DURATION_STEPS
+                    
+                    # Update central scheduler with new position (centralized mode)
+                    if self.model.mode == 'centralized' and self.model.central_scheduler:
+                        self.model.central_scheduler.update_agent_position(self.unique_id, self.node)
             else:
                 self._moving_to_staging = False
     

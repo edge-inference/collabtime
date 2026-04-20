@@ -69,12 +69,15 @@ class WarehouseGraph:
         is_perimeter = lambda x, y: (x <= perimeter_edge or x >= self.width - self.perimeter_depth or 
                                      y <= perimeter_edge or y >= self.height - self.perimeter_depth)
         
-        # Aisle buffer layer (inside perimeter)
-        buffer_inner = self.perimeter_depth
-        buffer_outer_x = self.width - self.perimeter_depth - 1
-        buffer_outer_y = self.height - self.perimeter_depth - 1
-        is_buffer = lambda x, y: (x == buffer_inner or x == buffer_outer_x or 
-                                  y == buffer_inner or y == buffer_outer_y)
+        # Aisle buffer layer (inside perimeter) - 2 cells wide for bidirectional traffic
+        buffer_start = self.perimeter_depth
+        buffer_end = self.perimeter_depth + self.buffer_depth
+        is_buffer = lambda x, y: (
+            (buffer_start <= x < buffer_end) or 
+            (self.width - buffer_end <= x < self.width - buffer_start) or
+            (buffer_start <= y < buffer_end) or 
+            (self.height - buffer_end <= y < self.height - buffer_start)
+        )
         
         # Middle separator (divides storage/sortation)
         middle_center = self.width // 2
@@ -140,12 +143,13 @@ class WarehouseGraph:
                 node_id = y * self.width + x
                 node_type = self.node_types[node_id]
                 
-                # Only connect traversable nodes
-                if node_type in ['aisle', 'staging']:
+                # Only connect traversable nodes (aisle, staging, and workstations)
+                traversable = ['aisle', 'staging', 'pick_location', 'pack_station']
+                if node_type in traversable:
                     # Right neighbor
                     if x < self.width - 1:
                         right_neighbor = y * self.width + (x + 1)
-                        if self.node_types[right_neighbor] in ['aisle', 'staging']:
+                        if self.node_types[right_neighbor] in traversable:
                             self.graph.add_edge(node_id, right_neighbor, weight=1.0)
                             self.costs[(node_id, right_neighbor)] = 1.0
                             self.costs[(right_neighbor, node_id)] = 1.0
@@ -153,7 +157,7 @@ class WarehouseGraph:
                     # Down neighbor
                     if y < self.height - 1:
                         down_neighbor = (y + 1) * self.width + x
-                        if self.node_types[down_neighbor] in ['aisle', 'staging']:
+                        if self.node_types[down_neighbor] in traversable:
                             self.graph.add_edge(node_id, down_neighbor, weight=1.0)
                             self.costs[(node_id, down_neighbor)] = 1.0
                             self.costs[(down_neighbor, node_id)] = 1.0
@@ -186,40 +190,61 @@ class WarehouseGraph:
         self._add_special_nodes()
     
     def _add_special_nodes(self):
-        """Add special-purpose nodes like docks, charging stations"""
+        """Add work nodes with minimum spacing to prevent direct face-to-face congestion"""
         num_pick, num_pack = calculate_pick_pack_locations(self.width, self.height)
-        
-        # exclude  middle passway from pick/pack locations
         middle_center = self.width // 2
-        middle_start = middle_center - (self.middle_separator_width // 2)
-        middle_end = middle_start + self.middle_separator_width
+        min_spacing = 1
         
-        # Filter out middle passway from storage aisles
-        storage_nodes = []
+        def is_adjacent_to_shelf(node_id):
+            x, y = self.node_to_pos(node_id)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    neighbor_id = ny * self.width + nx
+                    if self.node_types.get(neighbor_id) == 'shelf':
+                        return True
+            return False
+        
+        def select_with_spacing(candidates, count):
+            selected = []
+            shuffled = candidates[:]
+            random.shuffle(shuffled)
+            for node in shuffled:
+                x, y = self.node_to_pos(node)
+                too_close = False
+                for placed in selected:
+                    px, py = self.node_to_pos(placed)
+                    if abs(x - px) <= min_spacing and abs(y - py) <= min_spacing:
+                        too_close = True
+                        break
+                if not too_close:
+                    selected.append(node)
+                    if len(selected) >= count:
+                        break
+            return selected
+        
+        storage_candidates = []
         for n in self.regions['storage']:
             if self.node_types.get(n) == 'aisle':
                 x, y = self.node_to_pos(n)
-                if x < middle_start or x >= middle_end:
-                    storage_nodes.append(n)
+                if x < middle_center - 1 and is_adjacent_to_shelf(n):
+                    storage_candidates.append(n)
         
-        if storage_nodes:
-            pick_locations = random.sample(storage_nodes, min(num_pick, len(storage_nodes)))
-            
+        if storage_candidates:
+            pick_locations = select_with_spacing(storage_candidates, num_pick)
             for node in pick_locations:
                 self.node_types[node] = 'pick_location'
                 self.capacities[node] = WORK_STATION_CAPACITY
         
-        # Filter out middle passway from sortation aisles
-        sortation_nodes = []
+        sortation_candidates = []
         for n in self.regions['sortation']:
             if self.node_types.get(n) == 'aisle':
                 x, y = self.node_to_pos(n)
-                if x < middle_start or x >= middle_end:
-                    sortation_nodes.append(n)
+                if x > middle_center + 1 and is_adjacent_to_shelf(n):
+                    sortation_candidates.append(n)
         
-        if sortation_nodes:
-            pack_stations = random.sample(sortation_nodes, min(num_pack, len(sortation_nodes)))
-            
+        if sortation_candidates:
+            pack_stations = select_with_spacing(sortation_candidates, num_pack)
             for node in pack_stations:
                 self.node_types[node] = 'pack_station'
                 self.capacities[node] = WORK_STATION_CAPACITY

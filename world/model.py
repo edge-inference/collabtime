@@ -79,6 +79,7 @@ class WarehouseDSMModel(Model):
                  parallel_agents: bool = True,
                  agent_workers: int = None,
                  use_cython: bool = True,
+                 centralized_replicas: int = 10,
                  logger=None):
         
         super().__init__(seed=seed)
@@ -156,7 +157,7 @@ class WarehouseDSMModel(Model):
                 coordinator=self.coordinator,
                 model=self,
                 logger=self.logger,
-                service_time_s=0.0,  # No artificial delay (pure A* + lock overhead)
+                num_replicas=centralized_replicas,  # Concurrent service capacity
                 use_cython=True, # Mandatory
                 node_coords=self.node_coords,
                 graph_csr=self.graph_csr
@@ -208,7 +209,7 @@ class WarehouseDSMModel(Model):
                 if self.logger:
                     self.logger.info(f"Attempting Shared Memory allocation: {total_size/1024**2:.1f} MB "
                                    f"({self.num_agents} agents, {num_nodes} nodes, 8 segments)")
-                
+        
                 # 1. Jam Values (Agents x Nodes, float32)
                 self.shm_jam_vals = _allocate_shm_with_retry("jam_vals", jam_size)
                 self.shm_objects.append(self.shm_jam_vals)
@@ -304,6 +305,11 @@ class WarehouseDSMModel(Model):
         
         # Create agents
         self._create_agents(agent_positions)
+        
+        # Initialize central scheduler with agent positions (centralized mode only)
+        if self.mode == 'centralized' and self.central_scheduler:
+            for agent in self.schedule.agents:
+                self.central_scheduler.update_agent_position(agent.unique_id, agent.node)
         
         # Task management
         self.active_tasks = {}  # task_id -> task_info
@@ -560,10 +566,9 @@ class WarehouseDSMModel(Model):
             self.logger.info(f"Step {self.step_count}: Poisson state - time_to_next: {self._time_to_next_arrival_s:.2f}s, lam={lam}, dt={dt}")
     
     def _create_random_task(self) -> bool:
-        """Create a random task at a random location (on any aisle). Returns True if task was created."""
-        pick_pack_nodes = [n for n in range(self.warehouse.width * self.warehouse.height)
+        """Create a random task at designated work locations (pick/pack stations adjacent to shelves)."""
+        candidate_nodes = [n for n in range(self.warehouse.width * self.warehouse.height)
                            if self.warehouse.node_types.get(n) in ('pick_location', 'pack_station')]
-        candidate_nodes = pick_pack_nodes
         if not candidate_nodes:
             candidate_nodes = [n for n in range(self.warehouse.width * self.warehouse.height)
                                if self.warehouse.node_types.get(n) == 'aisle']
@@ -573,16 +578,15 @@ class WarehouseDSMModel(Model):
 
         if not available_nodes:
             if self.step_count % (TASK_SPAWN_LOG_INTERVAL_STEPS * 10) == 0:
-                self.logger.warning(f"Step {self.step_count}: TASK SPAWN BLOCKED - all pick/pack nodes occupied by agents! "
-                                   f"Candidates: {len(candidate_nodes)}, Occupied: {len(occupied_nodes)}, "
-                                   f"Pick/pack nodes: {len(pick_pack_nodes)}")
+                self.logger.warning(f"Step {self.step_count}: TASK SPAWN BLOCKED - all work locations occupied! "
+                                   f"Candidates: {len(candidate_nodes)}, Occupied: {len(occupied_nodes)}")
             return False
 
         if available_nodes:
             location = self.random.choice(available_nodes)
             
             if self.step_count % TASK_SPAWN_LOG_INTERVAL_STEPS == 0:
-                self.logger.info(f"Step {self.step_count}: {len(available_nodes)}/{len(candidate_nodes)} pick/pack locations free (excluding agent positions), spawned at node {location}")
+                self.logger.info(f"Step {self.step_count}: {len(available_nodes)}/{len(candidate_nodes)} work locations free, spawned task at node {location}")
             
             # Use coordinator for task creation (control plane)
             task_id = self.coordinator.create_task(location)

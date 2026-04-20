@@ -16,7 +16,7 @@
         </mxCell>
         
         <!-- Central Scheduler -->
-        <mxCell id="central-scheduler" value="Central Scheduler&#xa;(Bottleneck)&#xa;&#xa;• Perfect global state&#xa;• Space-Time A* pathfinding&#xa;• PUSH task assignment&#xa;• Conflict resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;strokeWidth=2;fontSize=12;align=center;fontStyle=1" vertex="1" parent="1">
+        <mxCell id="central-scheduler" value="Central Scheduler&#xa;(10 Replicas)&#xa;&#xa;• Perfect global state&#xa;• Congestion-aware A*&#xa;• PUSH task assignment&#xa;• Semaphore (10 concurrent)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;strokeWidth=2;fontSize=12;align=center;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="120" y="160" width="220" height="120" as="geometry" />
         </mxCell>
         
@@ -58,7 +58,7 @@
         </mxCell>
         
         <!-- Characteristics box -->
-        <mxCell id="cent-chars" value="✓ Optimal paths&#xa;✓ Perfect coordination&#xa;✗ Single bottleneck&#xa;✗ Poor scalability" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#d79b00;strokeWidth=2;fontSize=11;align=left;verticalAlign=top" vertex="1" parent="1">
+        <mxCell id="cent-chars" value="✓ Optimal paths&#xa;✓ Perfect fresh data&#xa;✓ Up to 10 concurrent requests&#xa;✗ Bottleneck when agents >> replicas" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#d79b00;strokeWidth=2;fontSize=11;align=left;verticalAlign=top" vertex="1" parent="1">
           <mxGeometry x="80" y="520" width="300" height="80" as="geometry" />
         </mxCell>
         
@@ -116,12 +116,12 @@
         </mxCell>
         
         <!-- DSM Data Plane box -->
-        <mxCell id="dsm-box" value="Data Plane (DSM Layers):&#xa;• Flow Trace  • Jam Signal&#xa;• Agent Location  • Path Intent&#xa;→ Propagated via Gossip (P2P)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#4a148c;strokeWidth=2;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+        <mxCell id="dsm-box" value="Data Plane (DSM Layers):&#xa;• Flow Trace  • Jam Signal&#xa;• Agent Location  • Path Intent&#xa;→ Gossip every 3 steps (P2P)&#xa;→ LWW merge semantics" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#4a148c;strokeWidth=2;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="550" y="480" width="400" height="70" as="geometry" />
         </mxCell>
         
         <!-- Characteristics box -->
-        <mxCell id="dist-chars" value="✓ High scalability&#xa;✓ No single bottleneck&#xa;✗ Stale data (AoI)&#xa;✗ 7.9% more distance/task" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;fontSize=11;align=left;verticalAlign=top" vertex="1" parent="1">
+        <mxCell id="dist-chars" value="✓ High scalability&#xa;✓ No single bottleneck&#xa;✓ Parallel pathfinding&#xa;✗ Stale data (AoI)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;fontSize=11;align=left;verticalAlign=top" vertex="1" parent="1">
           <mxGeometry x="600" y="580" width="300" height="80" as="geometry" />
         </mxCell>
         

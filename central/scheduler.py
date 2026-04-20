@@ -1,7 +1,18 @@
 """
 Centralized Path Scheduler for Baseline Comparison
-All agents request paths from this single authority, which has perfect global state
-but must serialize all pathfinding operations.
+
+Architecture:
+- Single shared database (perfect consistency, no replication lag)
+- Connection pool pattern: N concurrent worker threads
+- All workers access same data structures (in-memory)
+- No load balancer, no consensus overhead
+
+Note: This is OPTIMISTIC for centralized (favors centralized over distributed):
+- Real replicated systems would have replication lag or consensus overhead
+- Real deployments would have network latency (1-5ms per request)
+- Our model has zero latency, only thread pool contention
+
+Performance gap vs distributed is purely architectural (shared-state vs P2P).
 """
 
 from typing import List, Dict, Tuple, Optional, Set, Any
@@ -30,7 +41,7 @@ class CentralizedScheduler:
     
     def __init__(self, warehouse_graph, coordinator, model=None, logger=None, 
                  use_cython: bool = True, node_coords: Any = None, graph_csr: Any = None,
-                 service_time_s: float = 0.0):
+                 num_replicas: int = 10):
         self.graph = warehouse_graph
         self.coordinator = coordinator
         self.model = model
@@ -45,9 +56,12 @@ class CentralizedScheduler:
         self.flow_data: Dict[int, float] = defaultdict(float)
         self.jam_data: Dict[int, float] = defaultdict(float)
         
-        # Queueing bottleneck: centralized scheduler can only handle one request at a time
-        self.lock = threading.Lock()
-        self.service_time_s = service_time_s  # Time to process one request (2ms default)
+        # Realistic centralized architecture: multiple service replicas
+        self.num_replicas = num_replicas
+        self.semaphore = threading.Semaphore(num_replicas)  # Can handle N concurrent requests
+        self.active_requests = 0
+        self.contention_lock = threading.Lock()  # Only for tracking metrics, not blocking requests
+        self.data_lock = threading.Lock() # Protect shared data structures
         
         # Performance optimizations (Mandatory)
         self.use_cython = True
@@ -71,14 +85,18 @@ class CentralizedScheduler:
         self.fast_path_timestamps = np.zeros(1, dtype=np.int32)
         
         if self.logger:
-            self.logger.info("CentralizedScheduler: Cython-accelerated A* ENABLED (Mandatory)")
-            self.logger.info(f"CentralizedScheduler: Sequential pathfinding (no artificial delay)")
+            self.logger.info("CentralizedScheduler: Cython-accelerated A* ENABLED")
+            self.logger.info(f"CentralizedScheduler: Connection pool with {num_replicas} worker threads")
+            self.logger.info("CentralizedScheduler: Shared DB (perfect consistency, optimistic model)")
+            self.logger.info("CentralizedScheduler: No artificial latency, no replication overhead")
         
         self.metrics = {
             'total_requests': 0,
             'total_task_assignments': 0,
             'total_computation_time': 0,
-            'total_queue_wait_time': 0,
+            'replica_wait_time': 0.0,
+            'peak_concurrent_requests': 0,
+            'requests_queued': 0,
             'active_reservations': 0,
             'congestion_data_size': 0
         }
@@ -108,106 +126,135 @@ class CentralizedScheduler:
         Assignment is ATOMIC - scheduler claims task on behalf of agent.
         Returns (task_id, task_location) or None.
         
-        BOTTLENECK: Serialized through lock - only one agent can request at a time.
+        Uses semaphore: up to num_replicas concurrent requests.
+        Contention emerges naturally when agents > replicas.
         """
         request_start = time.time()
         
-        with self.lock:  # Queue bottleneck: agents wait in line
-            queue_wait = time.time() - request_start
-            self.metrics['total_queue_wait_time'] += queue_wait
-            self.metrics['total_task_assignments'] += 1
+        with self.semaphore:  # Acquire a service replica
+            wait_time = time.time() - request_start
             
-            available_tasks = self.coordinator.get_available_tasks()
-            if not available_tasks:
-                return None
-        
-        # Get both assigned locations and task_ids to prevent duplicates
-        assigned_locations = set(loc for _, loc in self.agent_task_assignments.values())
-        
-        best_task = None
-        best_distance = float('inf')
-        
-        scan_limit = 200
-        scanned = 0
-        
-        agent_pos_coords = self.graph.node_to_pos(agent_position)
-        
-        for task in available_tasks:
-            # Skip if task is already assigned to another agent
-            if task.task_id in self.assigned_task_ids:
-                continue
+            with self.contention_lock:
+                self.active_requests += 1
+                self.metrics['peak_concurrent_requests'] = max(
+                    self.metrics['peak_concurrent_requests'], 
+                    self.active_requests
+                )
+                if wait_time > 0:
+                    self.metrics['replica_wait_time'] += wait_time
+                    self.metrics['requests_queued'] += 1
+                self.metrics['total_task_assignments'] += 1
             
-            # Skip if location is already assigned
-            if task.location in assigned_locations:
-                continue
-                
-            scanned += 1
-            if scanned > scan_limit and best_task:
-                break
-            
-            task_coords = self.graph.node_to_pos(task.location)
-            distance = abs(agent_pos_coords[0] - task_coords[0]) + \
-                      abs(agent_pos_coords[1] - task_coords[1])
-            
-            if distance < best_distance:
-                best_distance = distance
-                best_task = (task.task_id, task.location)
-            
-            if best_task:
-                task_id, task_location = best_task
-                claim_success = self.coordinator.try_claim(task_id, agent_id, ttl_ms=300000)
-                if claim_success:
-                    self.agent_task_assignments[agent_id] = (task_id, task_location)
-                    self.assigned_task_ids.add(task_id)
-                    return best_task
-                else:
+            try:
+                available_tasks = self.coordinator.get_available_tasks()
+                if not available_tasks:
                     return None
-            
-            return None
+                
+                # Get both assigned locations and task_ids to prevent duplicates
+                assigned_locations = set(loc for _, loc in self.agent_task_assignments.values())
+                
+                best_task = None
+                best_distance = float('inf')
+                
+                scan_limit = 200
+                scanned = 0
+                
+                agent_pos_coords = self.graph.node_to_pos(agent_position)
+                
+                for task in available_tasks:
+                    # Skip if task is already assigned to another agent
+                    if task.task_id in self.assigned_task_ids:
+                        continue
+                    
+                    # Skip if location is already assigned
+                    if task.location in assigned_locations:
+                        continue
+                        
+                    scanned += 1
+                    if scanned > scan_limit and best_task:
+                        break
+                    
+                    task_coords = self.graph.node_to_pos(task.location)
+                    distance = abs(agent_pos_coords[0] - task_coords[0]) + \
+                              abs(agent_pos_coords[1] - task_coords[1])
+                    
+                    if distance < best_distance:
+                        best_distance = distance
+                        best_task = (task.task_id, task.location)
+                
+                if best_task:
+                    task_id, task_location = best_task
+                    claim_success = self.coordinator.try_claim(task_id, agent_id, ttl_ms=300000)
+                    if claim_success:
+                        self.agent_task_assignments[agent_id] = (task_id, task_location)
+                        self.assigned_task_ids.add(task_id)
+                        return best_task
+                    else:
+                        return None
+                
+                return None
+            finally:
+                with self.contention_lock:
+                    self.active_requests -= 1
     
     def report_flow(self, node: int, flow_value: float = 1.0):
         """Agent reports edge usage (perfect, instant update)."""
-        self.flow_data[node] += flow_value
-        # Fast array update
-        self.fast_flow_values[node] += flow_value
-        current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
-        self.fast_flow_timestamps[node] = current_time_ms
-            
-        self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
+        with self.data_lock:
+            self.flow_data[node] += flow_value
+            # Fast array update
+            self.fast_flow_values[node] += flow_value
+            current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
+            self.fast_flow_timestamps[node] = current_time_ms
+                
+            self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
     
     def report_jam(self, node: int, jam_value: float):
         """Agent reports congestion (perfect, instant update)."""
         alpha = 0.5
-        # Python dict update
-        self.jam_data[node] = alpha * jam_value + (1 - alpha) * self.jam_data[node]
-        
-        # Fast array update
-        self.fast_jam_values[node] = alpha * jam_value + (1 - alpha) * self.fast_jam_values[node]
         current_time_ms = int(self.model.step_count * self.model.step_duration_s * 1000) if self.model else 0
-        self.fast_jam_timestamps[node] = current_time_ms
+        
+        with self.data_lock:
+            # Python dict update
+            self.jam_data[node] = alpha * jam_value + (1 - alpha) * self.jam_data[node]
             
-        self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
+            # Fast array update
+            self.fast_jam_values[node] = alpha * jam_value + (1 - alpha) * self.fast_jam_values[node]
+            self.fast_jam_timestamps[node] = current_time_ms
+                
+            self.metrics['congestion_data_size'] = len(self.flow_data) + len(self.jam_data)
+        
+        if self.model and self.model.step_count % 100 == 0:
+            # Sample log to confirm it works
+            pass
     
     def request_path(self, agent_id: int, start: int, goal: int, current_step: int) -> List[int]:
         """
-        Central pathfinding request (BLOCKING) with congestion awareness.
+        Central pathfinding request with congestion awareness.
         
         Uses perfect, fresh congestion data (no staleness like distributed).
-        BOTTLENECK: Serialized through lock - agents wait in line for pathfinding.
+        Uses semaphore: up to num_replicas concurrent requests.
+        Contention emerges naturally when agents > replicas.
         """
         request_start = time.time()
         
-        with self.lock:  # Queue bottleneck: agents wait in line
-            queue_wait = time.time() - request_start
-            self.metrics['total_queue_wait_time'] += queue_wait
-            self.metrics['total_requests'] += 1
+        with self.semaphore:  # Acquire a service replica
+            wait_time = time.time() - request_start
             
-            # occupied_nodes = set(self.agent_positions.values()) # Deprecated for fast A*
-            
+            with self.contention_lock:
+                self.active_requests += 1
+                self.metrics['peak_concurrent_requests'] = max(
+                    self.metrics['peak_concurrent_requests'], 
+                    self.active_requests
+                )
+                if wait_time > 0:
+                    self.metrics['replica_wait_time'] += wait_time
+                    self.metrics['requests_queued'] += 1
+                self.metrics['total_requests'] += 1
+        
             try:
                 if start == goal:
                     return [start]
-                    
+                
                 # Optimized Pathfinding (Mandatory)
                 path = self._astar_fast_centralized(start, goal)
                 
@@ -222,6 +269,9 @@ class CentralizedScheduler:
                 if self.logger:
                     self.logger.warning(f"Central scheduler pathfinding failed: {e}")
                 return []
+            finally:
+                with self.contention_lock:
+                    self.active_requests -= 1
     
     def release_path(self, agent_id: int):
         """Agent releases its path reservation when done."""
@@ -311,18 +361,43 @@ class CentralizedScheduler:
         except (KeyError, TypeError):
             return 0
     
+    def get_stats(self) -> Dict[str, int]:
+        """
+        Get data statistics comparable to LocalDSMCache.get_stats().
+        Returns counts of entries in each data category.
+        """
+        with self.data_lock:
+            jam_entries = int(np.sum(self.fast_jam_values > 0.01))
+            flow_entries = int(np.sum(self.fast_flow_values > 0.01))
+        
+        return {
+            'jam_entries': jam_entries,
+            'flow_entries': flow_entries,
+            'agent_locations': len(self.agent_positions),
+            'path_intents': len(self.path_reservations),
+            'resource_states': len(self.agent_task_assignments)
+        }
+    
     def get_metrics(self) -> Dict:
         """Return scheduler performance metrics."""
         total_operations = self.metrics['total_requests'] + self.metrics['total_task_assignments']
-        avg_queue_wait = 0
-        if total_operations > 0:
-            avg_queue_wait = self.metrics['total_queue_wait_time'] / total_operations
+        avg_replica_wait = 0
+        if self.metrics['requests_queued'] > 0:
+            avg_replica_wait = self.metrics['replica_wait_time'] / self.metrics['requests_queued']
+        
+        stats = self.get_stats()
         
         return {
             'total_path_requests': self.metrics['total_requests'],
             'total_task_assignments': self.metrics['total_task_assignments'],
             'total_scheduler_operations': total_operations,
             'active_path_reservations': self.metrics['active_reservations'],
-            'total_queue_wait_time_s': self.metrics['total_queue_wait_time'],
-            'avg_queue_wait_time_ms': avg_queue_wait * 1000,
+            'num_replicas': self.num_replicas,
+            'peak_concurrent_requests': self.metrics['peak_concurrent_requests'],
+            'requests_queued': self.metrics['requests_queued'],
+            'total_replica_wait_time_s': self.metrics['replica_wait_time'],
+            'avg_replica_wait_time_ms': avg_replica_wait * 1000,
+            'replica_utilization': min(1.0, self.metrics['peak_concurrent_requests'] / self.num_replicas),
+            'data_stats': stats,
+            'total_data_entries': sum(stats.values()),
         }

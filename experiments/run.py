@@ -122,28 +122,13 @@ class ExperimentRunner:
         self.logger = logging.getLogger('ExperimentRunner')
         
     def create_warehouse_graph(self, warehouse_config: Dict) -> WarehouseGraph:
-        """Create warehouse graph from configuration."""
+        """Create warehouse graph from configuration.
+        
+        Uses rectangular regions by default (left half = storage, right half = sortation).
+        This provides ~100% coverage of shelf space like real Amazon warehouses.
+        """
         size = warehouse_config['size']
         graph = WarehouseGraph(width=size[0], height=size[1])
-        
-        # Add storage regions
-        for region in warehouse_config.get('storage_regions', []):
-            center = region['center']
-            radius = region['radius']
-            for x in range(max(0, center[0] - radius), min(size[0], center[0] + radius + 1)):
-                for y in range(max(0, center[1] - radius), min(size[1], center[1] + radius + 1)):
-                    if (x - center[0])**2 + (y - center[1])**2 <= radius**2:
-                        graph.add_storage_location((x, y))
-        
-        # Add sortation regions
-        for region in warehouse_config.get('sortation_regions', []):
-            center = region['center']
-            radius = region['radius']
-            for x in range(max(0, center[0] - radius), min(size[0], center[0] + radius + 1)):
-                for y in range(max(0, center[1] - radius), min(size[1], center[1] + radius + 1)):
-                    if (x - center[0])**2 + (y - center[1])**2 <= radius**2:
-                        graph.add_sortation_location((x, y))
-        
         return graph
         
     def generate_agent_positions(self, agents_config: Dict, warehouse_graph: WarehouseGraph, seed: Optional[int] = None) -> List[tuple]:
@@ -171,12 +156,18 @@ class ExperimentRunner:
     def run_single_experiment(self, config_name: str, config: Dict, use_lf: bool = False, seed_override: Optional[int] = None) -> ExperimentResult:
         """Run a single experiment configuration."""
         sim_mode = config.get('simulation', {}).get('mode', 'p2p')
+        seed = config.get('simulation', {}).get('seed', None)
+        if seed_override is not None:
+            seed = seed_override
         
         mode_dir = self.file_handler.get_mode_directory(
             'distributed' if sim_mode == 'p2p' else 'centralized'
         )
         
-        mode_log_path = mode_dir / 'experiments.log'
+        exp_subdir = mode_dir / f"{config_name}_seed{seed}"
+        exp_subdir.mkdir(parents=True, exist_ok=True)
+        
+        mode_log_path = exp_subdir / 'experiment.log'
         mode_file_handler = logging.FileHandler(mode_log_path)
         mode_file_handler.setLevel(logging.INFO)
         mode_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -263,6 +254,7 @@ class ExperimentRunner:
                 parallel_agents=config['simulation'].get('parallel_agents', True),
                 agent_workers=config['simulation'].get('agent_workers', None),
                 use_cython=config['simulation'].get('use_cython', True),
+                centralized_replicas=config['simulation'].get('centralized_replicas', 10),
                 seed=seed,
                 logger=self.logger
             )
@@ -333,6 +325,7 @@ class ExperimentRunner:
                 mode=sim_mode,
                 seed=seed
             )
+            result.exp_subdir = exp_subdir
             
             self.logger.info(f"Completed experiment: {config_name} in {duration_seconds:.2f}s")
             return result
@@ -355,6 +348,7 @@ class ExperimentRunner:
                 mode=sim_mode,
                 seed=seed
             )
+            result.exp_subdir = exp_subdir if 'exp_subdir' in locals() else None
             
             self.logger.error(f"Failed experiment: {config_name} - {e}\n{full_trace}")
             return result
@@ -393,58 +387,47 @@ class ExperimentRunner:
                         self.logger.info(f"Agent {agent_id} recovered at time {current_time}s")
     
     def save_results(self, results: List[ExperimentResult], is_incremental: bool = False):
-        """Save experiment results to various formats, grouped by mode into subfolders."""
+        """Save experiment results to individual experiment subdirectories."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Store timestamp for cleanup if this is incremental save
-        if is_incremental:
-            if not hasattr(self, '_incremental_timestamps'):
-                self._incremental_timestamps = []
-            self._incremental_timestamps.append(timestamp)
-        # Group results by mode
-        by_mode: Dict[str, List[ExperimentResult]] = {'distributed': [], 'centralized': [], 'unknown': []}
-        for r in results:
-            mode = (r.mode or 'unknown').lower()
-            if mode not in by_mode:
-                by_mode[mode] = []
-            by_mode[mode].append(r)
-
-        for mode, group in by_mode.items():
-            if not group:
+        for result in results:
+            if not hasattr(result, 'exp_subdir') or result.exp_subdir is None:
                 continue
-            mode_name = 'distributed' if mode in ['distributed', 'p2p'] else 'centralized' if mode == 'centralized' else 'misc'
-            out_dir = self.file_handler.get_mode_directory(mode_name)
-
-            # Save summary CSV
-            summary_data = []
-            for result in group:
-                summary_row = {
-                    'config_name': result.config_name,
-                    'mode': result.mode,
-                    'success': result.success,
-                    'duration_seconds': result.duration_seconds,
-                    'error_message': result.error_message or ''
-                }
-                if result.success:
-                    summary_row.update({f"perf_{k}": v for k, v in result.metrics.get('performance', {}).items()})
-                    summary_row.update({f"coord_{k}": v for k, v in result.metrics.get('coordination', {}).items()})
-                summary_data.append(summary_row)
-            summary_df = pd.DataFrame(summary_data)
+            
+            out_dir = result.exp_subdir
+            
+            summary_row = {
+                'config_name': result.config_name,
+                'mode': result.mode,
+                'seed': result.seed,
+                'success': result.success,
+                'duration_seconds': result.duration_seconds,
+                'error_message': result.error_message or ''
+            }
+            if result.success:
+                summary_row.update({f"perf_{k}": v for k, v in result.metrics.get('performance', {}).items()})
+                summary_row.update({f"coord_{k}": v for k, v in result.metrics.get('coordination', {}).items()})
+            
+            summary_df = pd.DataFrame([summary_row])
             summary_df.to_csv(out_dir / f'experiment_summary_{timestamp}.csv', index=False)
-
-            # Save detailed JSON
-            detailed_results = {
+            
+            result_dict = asdict(result)
+            if 'exp_subdir' in result_dict:
+                result_dict['exp_subdir'] = str(result_dict['exp_subdir'])
+            
+            detailed_result = {
                 'timestamp': timestamp,
                 'config_paths': [str(p) for p in self.config_paths],
-                'mode': mode,
-                'results': [asdict(result) for result in group]
+                'mode': result.mode,
+                'config_name': result.config_name,
+                'seed': result.seed,
+                'result': result_dict
             }
             with open(out_dir / f'experiment_details_{timestamp}.json', 'w') as f:
-                json.dump(detailed_results, f, indent=2, default=str)
-
-            # Plots
-            if 'plots' in self.output_config:
-                self._generate_mode_plots(group, timestamp, out_dir)
+                json.dump(detailed_result, f, indent=2, default=str)
+            
+            if 'plots' in self.output_config and result.success:
+                self._generate_mode_plots([result], timestamp, out_dir)
     
     def _generate_mode_plots(self, results: List[ExperimentResult], timestamp: str, out_dir: Path):
         """Generate plots for a specific mode in the given output directory."""
@@ -540,8 +523,12 @@ class ExperimentRunner:
                 self.save_results(results, is_incremental=True)
         
         self.save_results(results, is_incremental=False)
-        if hasattr(self, '_incremental_timestamps') and self._incremental_timestamps:
-            cleanup_duplicate_plots(self.file_handler.current_run_dir, self.logger)
+        
+        for result in results:
+            if hasattr(result, 'exp_subdir') and result.exp_subdir:
+                run_dir = result.exp_subdir.parent.parent
+                cleanup_duplicate_plots(run_dir, self.logger)
+        
         self.file_handler.mark_run_complete()
         
         return results
@@ -612,11 +599,6 @@ def main():
                        help='Agent count range for batch mode (e.g., 600 1000)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
-    lf_group = parser.add_mutually_exclusive_group()
-    lf_group.add_argument('--lf', dest='lf', action='store_true', default=True,
-                        help='Drive simulation steps from Lingua Franca tick events (default, required for determinism)')
-    lf_group.add_argument('--no-lf', dest='lf', action='store_false',
-                        help='Use internal clock - WARNING: NOT DETERMINISTIC, for testing only')
     
     parser.add_argument('--log-interval', type=int, default=None,
                        help='Progress log interval in steps (default: 100). Use 0 to disable.')
@@ -632,18 +614,15 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Start LF coordinator if requested
-    lf_proc = None
-    if args.lf:
-        lf_proc = start_lf_coordinator()
-        if lf_proc is None:
-            print("\nERROR: LF coordinator required but unavailable.")
-            print("Experiments require Lingua Franca for deterministic, reproducible results.")
-            print("Please compile the LF coordinator:")
-            print(f"  cd {Path(__file__).parent.parent / 'lf'}")
-            print("  lfc coordinator.lf")
-            print("\nOr use --no-lf for non-deterministic testing (NOT recommended for experiments).")
-            sys.exit(1)
+    # Start LF coordinator (always required)
+    lf_proc = start_lf_coordinator()
+    if lf_proc is None:
+        print("\nERROR: LF coordinator required but unavailable.")
+        print("Experiments require Lingua Franca for deterministic, reproducible results.")
+        print("Please compile the LF coordinator:")
+        print(f"  cd {Path(__file__).parent.parent / 'lf'}")
+        print("  lfc coordinator.lf")
+        sys.exit(1)
     
     # Process config paths - allow simple names like "large.yaml" or full paths
     config_paths = []
@@ -690,7 +669,7 @@ def main():
 
     # Run experiments
     start_time = time.time()
-    results = runner.run_experiments(experiments_to_run, use_lf=args.lf, seeds=seeds_to_run)
+    results = runner.run_experiments(experiments_to_run, use_lf=True, seeds=seeds_to_run)
     total_time = time.time() - start_time
     
     # Print summary

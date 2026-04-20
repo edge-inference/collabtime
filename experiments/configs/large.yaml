@@ -38,7 +38,7 @@ experiments:
 
   centralized_600_agents:
     name: "Centralized: 600 Agents"
-    description: "Centralized baseline with 600 agents to test scheduler saturation"
+    description: "Centralized baseline with shared DB + connection pool (optimistic model)"
     warehouse:
       size: [105, 85]
       storage_regions:
@@ -62,6 +62,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 
@@ -125,6 +126,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 
@@ -186,6 +188,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 
@@ -247,6 +250,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 
@@ -308,6 +312,7 @@ experiments:
       duration: 900
       step_interval: 100
       mode: centralized
+      centralized_replicas: 10
       seed: 42
       use_cython: true
 

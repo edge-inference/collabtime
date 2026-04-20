@@ -1,0 +1,316 @@
+# Strong Scaling Study
+# Fixed warehouse: 120 x 100 (12,000 cells)
+# Fixed arrival rate: λ = 5.0 tasks/s
+# Only varies: N (number of robots)
+# Measures: How does adding robots improve performance for fixed demand in fixed space?
+
+experiments:
+  strong_dist_50:
+    name: "Strong Scaling P2P: 50 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 50, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 6, use_cython: true}
+
+  strong_cent_50:
+    name: "Strong Scaling Centralized: 50 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 50, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_100:
+    name: "Strong Scaling P2P: 100 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 12, use_cython: true}
+
+  strong_cent_100:
+    name: "Strong Scaling Centralized: 100 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 100, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_200:
+    name: "Strong Scaling P2P: 200 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 200, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 14, use_cython: true}
+
+  strong_cent_200:
+    name: "Strong Scaling Centralized: 200 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 200, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_300:
+    name: "Strong Scaling P2P: 300 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 300, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 16, use_cython: true}
+
+  strong_cent_300:
+    name: "Strong Scaling Centralized: 300 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 300, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_500:
+    name: "Strong Scaling P2P: 500 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 24, use_cython: true}
+
+  strong_cent_500:
+    name: "Strong Scaling Centralized: 500 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 500, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_600:
+    name: "Strong Scaling P2P: 600 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 600, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 8, use_cython: true}
+
+  strong_cent_600:
+    name: "Strong Scaling Centralized: 600 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 600, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_700:
+    name: "Strong Scaling P2P: 700 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 700, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 8, use_cython: true}
+
+  strong_cent_700:
+    name: "Strong Scaling Centralized: 700 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 700, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_800:
+    name: "Strong Scaling P2P: 800 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 800, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 10, use_cython: true}
+
+  strong_cent_800:
+    name: "Strong Scaling Centralized: 800 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 800, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_900:
+    name: "Strong Scaling P2P: 900 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 900, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 10, use_cython: true}
+
+  strong_cent_900:
+    name: "Strong Scaling Centralized: 900 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 900, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+  strong_dist_1000:
+    name: "Strong Scaling P2P: 1000 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: p2p, seed: 42, use_spatial_hash: true, parallel_gossip: true, gossip_workers: 12, use_cython: true}
+
+  strong_cent_1000:
+    name: "Strong Scaling Centralized: 1000 Robots"
+    warehouse:
+      size: [120, 100]
+      storage_regions:
+        - {center: [30, 25], radius: 20}
+        - {center: [90, 75], radius: 20}
+      sortation_regions:
+        - {center: [60, 13], radius: 10}
+        - {center: [60, 87], radius: 10}
+    agents: {count: 1000, initial_positions: "random"}
+    coordination: {gossip_interval: 4, aoi_threshold: 1000, lease_ttl: 30000}
+    tasks: {arrival_rate: 5.0, types: ["pickup", "delivery", "sort"], priorities: [1, 1, 1]}
+    simulation: {duration: 900, step_interval: 100, mode: centralized, centralized_replicas: 10, seed: 42, use_cython: true}
+
+metrics:
+  performance: [tasks_completed, tasks_failed, completion_rate, average_completion_time, agent_utilization, total_distance_traveled]
+  coordination: [total_reads, total_writes, gossip_messages, aoi_violations, partition_quality, coordination_overhead]
+  time_series: [step, cumulative_completions, dsm_reads, dsm_writes]
+
+output:
+  directory: "results"
+  plots: ["dashboard_style"]
+  save_time_series: true

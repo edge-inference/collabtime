@@ -41,7 +41,7 @@ DEFAULT_WAREHOUSE_HEIGHT = 15
 
 # Warehouse layout: fixed topology structure
 PERIMETER_DEPTH = 1
-BUFFER_DEPTH = 1
+BUFFER_DEPTH = 2
 
 VERTICAL_AISLE_WIDTH = 2
 HORIZONTAL_AISLE_WIDTH = 2
@@ -58,8 +58,8 @@ WORK_STATION_CAPACITY = 1
 # Dynamic calculations: adapt to warehouse size
 def calculate_pick_pack_locations(width=DEFAULT_WAREHOUSE_WIDTH, height=DEFAULT_WAREHOUSE_HEIGHT):
     total_cells = width * height
-    pick_locations = max(10, int(total_cells * 0.15))
-    pack_stations = max(5, int(total_cells * 0.08))
+    pick_locations = max(30, int(total_cells * 0.05))
+    pack_stations = max(25, int(total_cells * 0.04))
     return pick_locations, pack_stations
 
 DEFAULT_PICK_LOCATIONS, DEFAULT_PACK_STATIONS = calculate_pick_pack_locations()

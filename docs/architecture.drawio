@@ -16,7 +16,7 @@
         </mxCell>
         
         <!-- DSM Registry (Right Middle) -->
-        <mxCell id="dsm" value="&lt;b&gt;DSM Registry&lt;/b&gt;&lt;br&gt;(Task Data)&lt;br&gt;&lt;br&gt;- task_registry&lt;br&gt;- create_task()&lt;br&gt;- claim_task()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=center;verticalAlign=top;fontSize=14;spacing=10;" vertex="1" parent="1">
+        <mxCell id="dsm" value="&lt;b&gt;Coordinator&lt;/b&gt;&lt;br&gt;(Control Plane)&lt;br&gt;&lt;br&gt;- TaskRegistry&lt;br&gt;- LeaseManager&lt;br&gt;- WatchManager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=center;verticalAlign=top;fontSize=14;spacing=10;" vertex="1" parent="1">
           <mxGeometry x="680" y="280" width="240" height="140" as="geometry" />
         </mxCell>
         
@@ -101,7 +101,7 @@
           <mxGeometry x="50" y="135" width="80" height="25" as="geometry" />
         </mxCell>
         
-        <mxCell id="legend-dsm" value="DSM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+        <mxCell id="legend-dsm" value="Coordinator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="50" y="170" width="80" height="25" as="geometry" />
         </mxCell>
         

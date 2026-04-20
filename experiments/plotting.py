@@ -206,15 +206,23 @@ def generate_system_perf_plot(result, timestamp: str, out_dir: Path, time_points
         axes[0].set_ylabel('Total Cache Entries')
         axes[0].grid(True, alpha=0.3)
     
-    # DSM Overhead
-    high_labels = ['Avg Cache\nSize', 'Total Gossip\nRounds']
-    high_values = [
-        coord.get('avg_cache_size', 0),
-        coord.get('total_gossip_rounds', 0)
-    ]
+    # Communication Overhead
+    mode = coord.get('coordination_mode', 'p2p')
+    if mode == 'centralized':
+        high_labels = ['Scheduler\nRequests', 'Comms\nper Task']
+        high_values = [
+            coord.get('total_scheduler_requests', 0),
+            coord.get('comms_per_task', 0)
+        ]
+    else:
+        high_labels = ['Peer\nExchanges', 'Comms\nper Task']
+        high_values = [
+            coord.get('total_peer_exchanges', coord.get('total_gossip_rounds', 0)),
+            coord.get('comms_per_task', 0)
+        ]
     colors_high = ['tab:purple', 'tab:cyan']
     axes[1].bar(high_labels, high_values, color=colors_high, alpha=0.7)
-    axes[1].set_title('DSM Overhead')
+    axes[1].set_title('Communication Overhead')
     axes[1].set_ylabel('Count')
     axes[1].grid(True, alpha=0.3, axis='y')
     
@@ -244,10 +252,15 @@ def generate_system_perf_plot(result, timestamp: str, out_dir: Path, time_points
         axes[3].set_xlabel('Time (s)')
         axes[3].set_ylabel('# Jammed Nodes (spread)', color='#1f77b4')
         axes[3].tick_params(axis='y', labelcolor='#1f77b4')
+        
+        max_jammed = max(num_jammed_nodes) if num_jammed_nodes else 1
+        axes[3].set_ylim(0, max(max_jammed * 1.1, 1))
+        axes[3].grid(False)
+        
         ax3_twin.set_ylabel('Avg Jam Severity (0-5)', color='#9467bd')
         ax3_twin.tick_params(axis='y', labelcolor='#9467bd')
-        ax3_twin.set_ylim([0, 5.5])
-        axes[3].grid(True, alpha=0.3)
+        ax3_twin.set_ylim(0, 5.5)
+        ax3_twin.grid(True, alpha=0.3)
         
         lines1, labels1 = axes[3].get_legend_handles_labels()
         lines2, labels2 = ax3_twin.get_legend_handles_labels()
@@ -270,8 +283,10 @@ def generate_system_perf_plot(result, timestamp: str, out_dir: Path, time_points
         axes[4].set_xlabel('Time (s)')
         axes[4].set_ylabel('# Stalled Agents (count)', color='#d62728')
         axes[4].tick_params(axis='y', labelcolor='#d62728')
+        axes[4].set_ylim(bottom=0)
         ax4_twin.set_ylabel('Avg Stall Duration (steps)', color='#ff7f0e')
         ax4_twin.tick_params(axis='y', labelcolor='#ff7f0e')
+        ax4_twin.set_ylim(bottom=0)
         axes[4].grid(True, alpha=0.3)
         
         lines1, labels1 = axes[4].get_legend_handles_labels()

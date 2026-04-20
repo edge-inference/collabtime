@@ -324,10 +324,11 @@ class LocalDSMCache:
         # SHM mode is mandatory, this should never execute
         raise RuntimeError("LocalDSMCache requires shared memory arrays (use_fast_arrays=True)")
     
-    def get_jam_intensity(self) -> float:
-        """Get total jam intensity (sum of all jam values in cache)"""
+    def get_jam_intensity(self, current_time_ms: int, max_aoi_ms: int) -> float:
+        """Get total jam intensity (sum of fresh jam values in cache)"""
         if self.use_fast_arrays and self.shm_metadata:
-            return float(np.sum(self.jam_values))
+            fresh_mask = (current_time_ms - self.jam_timestamps) <= max_aoi_ms
+            return float(np.sum(self.jam_values[fresh_mask]))
         raise RuntimeError("SHM arrays required")
     
     def cleanup_stale_entries(self, max_age_ms: int, current_time_ms: int = None):

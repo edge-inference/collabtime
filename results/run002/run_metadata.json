@@ -1,0 +1,257 @@
+{
+  "run_id": "run002",
+  "timestamp": "2025-12-08T03:02:59.112611",
+  "description": "Baseline comparison: scalability_200_agents, centralized_200_agents, scalability_300_agents, centralized_300_agents, scalability_500_agents, centralized_500_agents",
+  "configs": [
+    "scalability_200_agents",
+    "centralized_200_agents",
+    "scalability_300_agents",
+    "centralized_300_agents",
+    "scalability_500_agents",
+    "centralized_500_agents"
+  ],
+  "status": "completed",
+  "config_details": {
+    "scalability_200_agents": {
+      "warehouse": {
+        "dimensions": [
+          70,
+          55
+        ],
+        "total_cells": 3850,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 200,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "p2p",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 3.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 3,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    },
+    "centralized_200_agents": {
+      "warehouse": {
+        "dimensions": [
+          70,
+          55
+        ],
+        "total_cells": 3850,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 200,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "centralized",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 3.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 3,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    },
+    "scalability_300_agents": {
+      "warehouse": {
+        "dimensions": [
+          80,
+          65
+        ],
+        "total_cells": 5200,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 300,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "p2p",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 4.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 4,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    },
+    "centralized_300_agents": {
+      "warehouse": {
+        "dimensions": [
+          80,
+          65
+        ],
+        "total_cells": 5200,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 300,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "centralized",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 4.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 4,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    },
+    "scalability_500_agents": {
+      "warehouse": {
+        "dimensions": [
+          95,
+          80
+        ],
+        "total_cells": 7600,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 500,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "p2p",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 5.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 4,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    },
+    "centralized_500_agents": {
+      "warehouse": {
+        "dimensions": [
+          95,
+          80
+        ],
+        "total_cells": 7600,
+        "storage_regions": 2,
+        "sortation_regions": 2
+      },
+      "agents": {
+        "count": 500,
+        "initial_positions": "random"
+      },
+      "simulation": {
+        "mode": "centralized",
+        "duration_s": 900,
+        "step_interval_ms": 100,
+        "total_steps": 9000,
+        "seed": 42
+      },
+      "tasks": {
+        "arrival_rate": 5.0,
+        "types": [
+          "pickup",
+          "delivery",
+          "sort"
+        ],
+        "priorities": [
+          1,
+          1,
+          1
+        ]
+      },
+      "coordination": {
+        "gossip_interval": 4,
+        "aoi_threshold_ms": 1000,
+        "lease_ttl_ms": 30000
+      }
+    }
+  },
+  "completed_at": "2025-12-08T05:19:22.971956"
+}
