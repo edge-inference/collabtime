@@ -30,6 +30,10 @@ plt.rcParams.update(
         "axes.grid": False,
         "axes.spines.top": True,
         "axes.spines.right": True,
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "savefig.facecolor": "white",
+        "savefig.transparent": False,
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
     }
