@@ -352,9 +352,14 @@ def plot_scaling_summary(group_summary: pd.DataFrame, path: Path) -> None:
         },
     }
     panels = (
-        ("completion_rate", "Completion rate (%)", 100.0, (0, 100)),
+        ("completion_rate", "Completion fraction (%)", 100.0, (0, 100)),
         ("throughput_tps", "Throughput (tasks/s)", 1.0, None),
-        ("average_completion_time_s", "Average latency (s)", 1.0, None),
+        (
+            "average_completion_time_s",
+            "Mean latency of completed tasks (s)",
+            1.0,
+            None,
+        ),
         ("agent_work_fraction_final", "Work state fraction (%)", 100.0, (0, 100)),
     )
     fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.2), constrained_layout=True)
