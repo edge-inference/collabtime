@@ -73,6 +73,10 @@ def _flatten(record: dict) -> dict:
     row["arrival_rate_per_robot"] = (
         row["configured_arrival_rate_tps"] / row["fleet_size"]
     )
+    row["tasks_active_end_per_robot"] = row["tasks_active_end"] / row["fleet_size"]
+    row["arrival_completion_gap_tps"] = (
+        row["realized_arrival_rate_tps"] - row["throughput_tps"]
+    )
     work_state_duration_s = (
         (TASK_WORK_DURATION_STEPS + 1) * row["step_interval_ms"] / 1000.0
     )
@@ -208,6 +212,9 @@ def _estimate(values: pd.Series) -> dict:
 def summarize_groups(frame: pd.DataFrame) -> pd.DataFrame:
     rows = []
     metrics = STATE_METRICS + OUTCOME_METRICS + (
+        "tasks_active_end",
+        "tasks_active_end_per_robot",
+        "arrival_completion_gap_tps",
         "offered_work_fraction_nominal",
         "offered_work_fraction_realized",
         "completed_nominal_work_fraction",
