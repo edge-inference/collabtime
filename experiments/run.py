@@ -8,6 +8,7 @@ import yaml
 import json
 import argparse
 import logging
+import random
 import time
 import os
 import sys
@@ -87,10 +88,10 @@ class ExperimentRunner:
         )
         self.logger = logging.getLogger('ExperimentRunner')
         
-    def create_warehouse_graph(self, warehouse_config: Dict) -> WarehouseGraph:
+    def create_warehouse_graph(self, warehouse_config: Dict, seed: Optional[int] = None) -> WarehouseGraph:
         """Create warehouse graph from configuration."""
         size = warehouse_config['size']
-        graph = WarehouseGraph(width=size[0], height=size[1])
+        graph = WarehouseGraph(width=size[0], height=size[1], rng=random.Random(seed))
         
         # Add storage regions
         for region in warehouse_config.get('storage_regions', []):
@@ -112,7 +113,9 @@ class ExperimentRunner:
         
         return graph
         
-    def generate_agent_positions(self, agents_config: Dict, warehouse_graph: WarehouseGraph) -> List[tuple]:
+    def generate_agent_positions(
+        self, agents_config: Dict, warehouse_graph: WarehouseGraph, seed: Optional[int] = None
+    ) -> List[tuple]:
         """Generate initial agent positions."""
         if isinstance(agents_config['initial_positions'], str) and agents_config['initial_positions'] == 'random':
             # Generate random positions
@@ -125,10 +128,10 @@ class ExperimentRunner:
                 raise ValueError("No valid starting positions found in warehouse graph!")
             
             positions = []
-            np.random.seed(42)  # For reproducibility
+            rng = np.random.default_rng(seed)
             
             for _ in range(agents_config['count']):
-                pos = valid_nodes[np.random.randint(len(valid_nodes))]
+                pos = valid_nodes[rng.integers(len(valid_nodes))]
                 positions.append(pos)
             return positions
         else:
@@ -200,8 +203,8 @@ class ExperimentRunner:
         start_time = datetime.now()
         
         try:
-            warehouse_graph = self.create_warehouse_graph(config['warehouse'])
-            agent_positions = self.generate_agent_positions(config['agents'], warehouse_graph)
+            warehouse_graph = self.create_warehouse_graph(config['warehouse'], seed=seed)
+            agent_positions = self.generate_agent_positions(config['agents'], warehouse_graph, seed=seed)
             
             duration = config['simulation']['duration']
             step_interval = config['simulation']['step_interval']
@@ -237,10 +240,10 @@ class ExperimentRunner:
                 self.logger.info("Connected to LF tick server on 127.0.0.1:9001")
                 
                 current_step = 0
-                for _ in tick_iter:
+                for current_time_ms in tick_iter:
                     if current_step >= steps:
                         break
-                    model.step()
+                    model.advance(current_time_ms)
                     if current_step % 10 == 0:
                         step_metrics = self.collect_step_metrics(model, current_step)
                         metrics_data.append(step_metrics)
@@ -377,7 +380,7 @@ class ExperimentRunner:
         
         return {
             'step': step,
-            'timestamp': time.time(),
+            'timestamp': model.current_time_ms / 1000.0,
             'tasks_created': model.task_counter,
             'tasks_completed': len([t for t in model.completed_tasks]),
             'tasks_active': len([t for t in model.active_tasks]),
@@ -441,20 +444,23 @@ class ExperimentRunner:
             # Centralized: report central scheduler data store size
             avg_cache_size = model.central_scheduler.metrics['congestion_data_size'] if model.central_scheduler else 0
             total_gossip_rounds = 0
+            coordination_details = model.get_coordination_metrics()
         else:
             # Distributed: report per-agent local cache and gossip
             avg_cache_size = np.mean([
                 sum(agent.local_cache.get_stats().values()) if agent.local_cache else 0
                 for agent in model.schedule.agents
             ])
-            total_gossip_rounds = df['gossip_rounds'].max() if 'gossip_rounds' in df else 0
+            coordination_details = model.get_coordination_metrics()
+            total_gossip_rounds = coordination_details['gossip_rounds']
         
         coordination_metrics = {
             'avg_cache_size': float(avg_cache_size),
             'total_gossip_rounds': int(total_gossip_rounds),
             'tasks_in_registry': len(model.coordinator.task_registry.tasks),
             'active_leases': len([l for l in model.coordinator.lease_manager.leases.values() if l]),
-            'coordination_mode': model.mode
+            'coordination_mode': model.mode,
+            **coordination_details,
         }
         
         time_series = {
