@@ -1,0 +1,40 @@
+{
+  "fleet_size": 600,
+  "mode": "centralized",
+  "seed": 42,
+  "duration_s": 900.0,
+  "warmup_s": 180.0,
+  "step_interval_ms": 100,
+  "sample_every_steps": 10,
+  "layout_seed": 10600,
+  "layout_digest": "729241f593f75f74821f184a3009575561bb42b89c1fd1c3a52e97ae5b087e06",
+  "stream_digest": "360803a4290adb3629d4788f3b99e09208ea9873b19215ad3e21cd417825b47e",
+  "stream_event_count": 4944,
+  "tasks_created": 4944,
+  "tasks_completed": 3481,
+  "tasks_active_end": 1463,
+  "completion_rate": 0.7040857605177994,
+  "throughput_tps": 3.867777777777778,
+  "average_completion_time_s": 232.21315713875322,
+  "latency_p90_s": 437.0,
+  "agent_work_fraction_final": 0.29852407407407405,
+  "offered_work_fraction_nominal": 0.4125,
+  "offered_work_fraction_realized": 0.412,
+  "full": {
+    "working_fraction": 0.2984685185185185,
+    "navigating_fraction": 0.5941648148148146,
+    "idle_fraction": 0.10736666666666683,
+    "active_fraction": 0.8926333333333332,
+    "mean_stuck_agents": 28.265555555555554,
+    "sample_count": 900
+  },
+  "post_warmup": {
+    "working_fraction": 0.36098379629629634,
+    "navigating_fraction": 0.6184699074074071,
+    "idle_fraction": 0.02054629629629645,
+    "active_fraction": 0.9794537037037035,
+    "mean_stuck_agents": 29.823611111111113,
+    "sample_count": 720
+  },
+  "wall_time_s": 159.40008440054953
+}

@@ -1,0 +1,27 @@
+{
+  "pair_count": 40,
+  "record_count": 80,
+  "fleet_sizes": [
+    50,
+    100,
+    200,
+    300,
+    500,
+    600,
+    700,
+    800
+  ],
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "all_stream_digests_paired": true,
+  "all_layout_digests_paired": true,
+  "all_created_task_counts_paired": true,
+  "maximum_state_partition_error": 1.1102230246251565e-16,
+  "maximum_sampled_vs_counter_work_fraction_difference": 0.0005599999999998939,
+  "maximum_incomplete_task_work_fraction": 0.02480888888888899
+}

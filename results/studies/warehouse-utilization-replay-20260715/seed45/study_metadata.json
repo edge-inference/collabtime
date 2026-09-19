@@ -1,0 +1,20 @@
+{
+  "fleet_sizes": [
+    50,
+    100,
+    200,
+    300,
+    500,
+    600,
+    700,
+    800
+  ],
+  "seeds": [
+    45
+  ],
+  "duration_override_s": 900.0,
+  "warmup_s": 180.0,
+  "sample_every_steps": 10,
+  "task_work_duration_s": 45.0,
+  "base_commit": "329ab7daed9c4d726b1af77de17c5cb7738c2e24"
+}

@@ -231,16 +231,20 @@ Study implementation commits on branch `study/utilization-replay`:
 The approved figure and corresponding thesis interpretation were integrated in
 `gatech_thesis` commit `ff23bca`.
 
-Raw output is stored outside the repository at:
+The curated study record is versioned with the repository at:
 
-`/home/modfi/ivalab-study-results/warehouse-utilization-replay-20260715`
+`results/studies/warehouse-utilization-replay-20260715`
+
+It retains the exact replay traces, seed metadata, raw run summaries,
+aggregate CSV tables, and validation metadata. Generated plots and transient
+logs are omitted because they can be regenerated from these retained inputs.
 
 The final analysis command is:
 
 ```bash
-/home/modfi/ivalab/venv/bin/python -m studies.analyze_utilization_replay \
-  /home/modfi/ivalab-study-results/warehouse-utilization-replay-20260715 \
-  --output /home/modfi/ivalab-study-results/warehouse-utilization-replay-20260715/analysis
+python -m studies.analyze_utilization_replay \
+  results/studies/warehouse-utilization-replay-20260715 \
+  --output results/studies/warehouse-utilization-replay-20260715/analysis
 ```
 
 The analyzer validated 40 pairs and 80 records. Every pair has matching task
