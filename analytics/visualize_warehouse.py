@@ -44,7 +44,7 @@ def load_configs():
     return dict(sorted(warehouses.items()))
 
 
-def draw_warehouse_grid(ax, agents, config):
+def draw_warehouse_grid(ax, agents, config, show_title=True):
     """Draw warehouse using proper grid cells like the dashboard."""
     width, height = config['size']
     
@@ -117,13 +117,14 @@ def draw_warehouse_grid(ax, agents, config):
     cells = width * height
     density = agents / cells * 100
     
-    ax.set_title(f'{agents} Agents: {width}x{height} = {cells:,} cells ({density:.1f}% density)',
-                 fontsize=11, fontweight='bold')
+    if show_title:
+        ax.set_title(f'{agents} Agents: {width}x{height} = {cells:,} cells ({density:.1f}% density)',
+                     fontsize=11, fontweight='bold')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
 
 
-def generate_all_layouts(output_dir: Path = None, output_format: str = "png"):
+def generate_all_layouts(output_dir: Path = None, output_format: str = "png", show_title=True):
     """Generate layout visualizations for all warehouse configurations."""
     warehouses = load_configs()
     
@@ -144,7 +145,7 @@ def generate_all_layouts(output_dir: Path = None, output_format: str = "png"):
     
     for idx, (agents, config) in enumerate(warehouses.items()):
         print(f"Drawing {agents} agents warehouse...")
-        draw_warehouse_grid(axes[idx], agents, config)
+        draw_warehouse_grid(axes[idx], agents, config, show_title=show_title)
     
     for idx in range(n_warehouses, len(axes)):
         axes[idx].axis('off')
@@ -172,7 +173,7 @@ def generate_all_layouts(output_dir: Path = None, output_format: str = "png"):
         scale = max(1, min(width, height) / 40)
         fig, ax = plt.subplots(figsize=(8 * scale, 6 * scale))
         
-        draw_warehouse_grid(ax, agents, config)
+        draw_warehouse_grid(ax, agents, config, show_title=show_title)
         ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=9)
         
         cells = width * height
@@ -205,6 +206,7 @@ def main():
     parser.add_argument('--output', '-o', type=str, help='Output directory')
     parser.add_argument('--agents', '-a', type=int, help='Show only specific agent count')
     parser.add_argument('--format', '-f', type=str, default='png', help='Output format (png or pdf)')
+    parser.add_argument('--no-title', action='store_true', help='Omit agent-count title from plots')
     args = parser.parse_args()
     
     output_dir = Path(args.output) if args.output else None
@@ -221,12 +223,12 @@ def main():
             return
         
         fig, ax = plt.subplots(figsize=(14, 10))
-        draw_warehouse_grid(ax, args.agents, warehouses[args.agents])
+        draw_warehouse_grid(ax, args.agents, warehouses[args.agents], show_title=not args.no_title)
         ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1))
         plt.tight_layout()
         plt.show()
     else:
-        generate_all_layouts(output_dir, output_format)
+        generate_all_layouts(output_dir, output_format, show_title=not args.no_title)
 
 
 if __name__ == '__main__':
