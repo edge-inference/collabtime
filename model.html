@@ -14,7 +14,7 @@
 <header class="masthead"><a class="wordmark" href="index.html">Collab<span>Time</span><i aria-hidden="true"></i></a><nav aria-label="Main navigation"><a href="index.html">Overview</a><a href="#request">One request</a><a href="#shared">Shared server</a><a href="#loop">The loop</a><a href="#step">In step</a><a href="#scheduler">Scheduler</a></nav></header>
 <main id="main">
 <section class="page-hero">
-  <div><p class="eyebrow">Method · Timing model</p><h1>From a hardware time<br>to the robot’s<br><em>next move.</em></h1><p class="lead">For every inference request the model answers one question: when can the robot use the reply? Six replays show how that answer is built, how it reaches the simulated robot, and how the scheduler uses it. Play each one, pause it, or step through it.</p></div>
+  <div><p class="eyebrow">Method · Timing model</p><h1>From a hardware time<br>to the robot’s<br><em>next move.</em></h1><p class="lead">For every inference request, the timing model determines when the robot can use the model output. Six interactive examples show how response latency is computed, how outputs reach the simulated robot, and how the scheduler uses latency estimates. Play each example, pause it, or step through it.</p></div>
   <ol class="toc" aria-label="On this page"><li><a href="#request"><span>01</span>One request: ready, start, finish</a></li><li><a href="#shared"><span>02</span>Many robots on one server</a></li><li><a href="#loop"><span>03</span>The loop that couples hardware and task</a></li><li><a href="#step"><span>04</span>Why the two clocks stay in step</a></li><li><a href="#tick"><span>05</span>From a finish time to an action</a></li><li><a href="#scheduler"><span>06</span>The scheduler that holds System 2</a></li></ol>
 </section>
 
@@ -103,10 +103,10 @@
 </section>
 
 <section id="loop" class="section">
-  <div class="section-heading"><p class="eyebrow">03 / The loop</p><h2>What the reply says,<br>and when it lands.</h2><p>The loop of Figure 4 couples the task simulator to the hardware model. It answers two questions with two different tools.</p></div>
+  <div class="section-heading"><p class="eyebrow">03 / The loop</p><h2>Model output and<br>when the robot can use it.</h2><p>The loop of Figure 4 couples the task simulator to the hardware model. Model inference determines the output; hardware modeling determines when it becomes available to the robot.</p></div>
   <div class="two">
-    <div class="panel"><h3>What does the reply say?</h3><p>The real model answers, at once, on the simulation host. The time the host takes is ignored.</p></div>
-    <div class="panel"><h3>When may the robot use it?</h3><p>The resource model answers. It plays the target CPU, GPU and link from the two rules above, in simulated time. Until then the reply waits, locked.</p></div>
+    <div class="panel"><h3>What does the model produce?</h3><p>Actual inference runs on the simulation host to produce the model output. Host execution time does not advance simulated time.</p></div>
+    <div class="panel"><h3>When may the robot use it?</h3><p>The resource model simulates the target CPU, GPU and link. The output remains pending until its modeled release time.</p></div>
   </div>
   <div class="panel">
     <div class="stepper">
@@ -138,10 +138,10 @@
   <dl class="glossary">
     <div><dt>t</dt><dd>The simulated clock. It advances one tick, Δ, per pass.</dd></div>
     <div><dt>U</dt><dd>The skill each robot is executing now.</dd></div>
-    <div><dt>P</dt><dd>Replies already computed and not yet released. Each carries a release time.</dd></div>
+    <div><dt>P</dt><dd>Model outputs already computed and not yet released. Each carries a release time.</dd></div>
     <div><dt>R</dt><dd>The resource model: the queues and timing of the target hardware.</dd></div>
     <div><dt>N</dt><dd>The robots that need a decision in this tick.</dd></div>
-    <div><dt>Y</dt><dd>The replies from the real model, one per robot in N.</dd></div>
+    <div><dt>Y</dt><dd>The model outputs, one per robot in N.</dd></div>
     <div><dt>D</dt><dd>What each request costs: its prompt and output lengths.</dd></div>
     <div><dt>←</dt><dd>“Gets”: compute the right side and store it under the name on the left.</dd></div>
   </dl>
@@ -151,8 +151,8 @@
   <div class="section-heading"><p class="eyebrow">04 / In step</p><h2>Two clocks,<br>one time.</h2><p>The world and the hardware model are two simulations. At every tick the hardware model is moved forward to the world’s time, and no further.</p></div>
   <div class="explain">
     <div class="prose">
-      <p><strong>Not ahead of the world.</strong> A request that arrives later can still slow one that arrived earlier. If the hardware model ran robot A’s request straight to its end, robot B’s request would arrive too late to count, and A would get its reply one tick too early. Switch the replay to “Running ahead” to see it.</p>
-      <p><strong>Not behind the world.</strong> A reply that is finished must reach its robot at the next tick, not later.</p>
+      <p><strong>Not ahead of the world.</strong> A request that arrives later can still slow one that arrived earlier. If the hardware model ran robot A’s request straight to its end, robot B’s request would arrive too late to count, and A would receive its model output one tick too early. Switch the replay to “Running ahead” to see it.</p>
+      <p><strong>Not behind the world.</strong> A model output must be released at the first control tick at or after its modeled completion time plus any dispatch delay.</p>
       <p>So a finish time is never fixed when a request arrives. It is settled tick by tick, as the world shows what else is asked.</p>
     </div>
     <div class="panel">
@@ -180,13 +180,13 @@
 </section>
 
 <section id="tick" class="section">
-  <div class="section-heading"><p class="eyebrow">05 / Next tick</p><h2>A reply acts at<br>the next control tick.</h2><p>A robot applies commands on its control clock. A reply that finishes between two ticks waits for the next one.</p></div>
+  <div class="section-heading"><p class="eyebrow">05 / Next tick</p><h2>Model outputs take effect<br>at a control tick.</h2><p>A robot applies commands on its control clock. When inference completes between two ticks, the output is applied at the next one.</p></div>
   <div class="explain">
     <div class="prose">
       <div class="eq" role="group" aria-label="Equation 4 in words">
         <div><span class="lab">acts at</span> the first tick at or after ( finish + dispatch delay )</div>
       </div>
-      <p>Equation 4 in the paper. This rounding is the last step from a hardware time to a robot action. A faster control clock wastes less of a fast reply.</p>
+      <p>Equation 4 in the paper. This rounding maps completion and dispatch time to a control tick. A faster control clock reduces the wait before the robot can apply the output.</p>
       <p class="note">The dispatch delay is zero in this picture.</p>
     </div>
     <div class="panel">
@@ -196,15 +196,15 @@
         <button type="button" data-hz="30" aria-pressed="false">30 Hz</button>
         <button type="button" data-hz="60" aria-pressed="false">60 Hz</button>
       </div>
-      <label class="slider" for="finish"><span>Reply finishes at</span><input id="finish" type="range" min="0" max="400" step="1" value="137"><output id="finish-out" for="finish">137 ms</output></label>
-      <svg id="tick-svg" viewBox="0 0 640 118" role="img" aria-labelledby="tick-title"><title id="tick-title">A time axis with control ticks. The reply finishes between two ticks and is applied at the next one.</title>
+      <label class="slider" for="finish"><span>Modeled completion time</span><input id="finish" type="range" min="0" max="400" step="1" value="137"><output id="finish-out" for="finish">137 ms</output></label>
+      <svg id="tick-svg" viewBox="0 0 640 118" role="img" aria-labelledby="tick-title"><title id="tick-title">A time axis with control ticks. Modeled inference completes between two ticks; the output is applied at the next one.</title>
         <line class="d-axis" x1="40" y1="62" x2="600" y2="62"/><g id="tick-marks"></g>
         <text class="d-lab" x="40" y="104" text-anchor="middle">0</text><text class="d-lab" x="600" y="104" text-anchor="middle">400 ms</text>
       </svg>
-      <p class="readout" aria-live="polite"><strong id="tick-ms">150 ms</strong><span id="tick-text">applied, 13 ms after the reply was ready</span></p>
+      <p class="readout" aria-live="polite"><strong id="tick-ms">150 ms</strong><span id="tick-text">applied, 13 ms after modeled completion</span></p>
     </div>
   </div>
-  <aside class="interpretation"><strong>How the model is checked</strong><p>The native co-execution tests replace the modeled finish time with replies from the physical device: the simulator advances at the command cadence while inference runs on Thor. That separates a measured benefit of an allocation from a prediction of the timing model. <a class="inline" href="index.html#findings">See the findings</a>.</p></aside>
+  <aside class="interpretation"><strong>How the model is checked</strong><p>The native co-execution tests use observed completion times instead of modeled completion times: the simulator advances at the command cadence while inference runs on Thor. That separates a measured benefit of an allocation from a prediction of the timing model. <a class="inline" href="index.html#findings">See the findings</a>.</p></aside>
 </section>
 <section id="scheduler" class="section">
   <div class="section-heading"><p class="eyebrow">06 / Scheduler</p><h2>Hold System 2 only<br>as long as needed.</h2><p>On one module the two models share a GPU. For each action inference the scheduler decides whether System 2 must wait, and for how long.</p></div>

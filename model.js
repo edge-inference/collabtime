@@ -129,9 +129,9 @@ const STEPS = [
   {l: [4], t: '0 ms', a: 'Skill ended, needs a decision', b: 'Carrying a cup', p: 'Empty', r: 'Idle',
     n: 'Each robot runs its own skill for this tick. Robot A’s skill has just ended, so A joins N, the robots that need a decision.'},
   {l: [5], t: '0 ms', a: 'Waiting', b: 'Carrying a cup', p: 'Empty', r: 'Idle',
-    n: 'The real model runs on the host for A’s image and prompt. It returns the reply Y, “go to the kitchen”, and the cost D: 800 prompt tokens and 40 output tokens. The clock does not move.'},
+    n: 'Inference runs on the simulation host using A’s image and prompt. It produces the model output Y, “go to the kitchen”, and resource demand D: 800 prompt tokens and 40 output tokens. Simulated time does not advance during host inference.'},
   {l: [6, 7], t: '0 ms', a: 'Waiting', b: 'Carrying a cup', p: 'A: go to the kitchen, release unknown', r: 'A in service',
-    n: 'The reply is stored but locked: its release time is infinity. Only the cost goes to the resource model, which plays the target hardware.'},
+    n: 'The model output is stored in the pending set. Its release time is initially infinity, so the robot cannot use it yet. The resource model receives the request’s demand to simulate execution on the target hardware.'},
   {l: [8, 9], t: '100 ms', a: 'Waiting', b: 'Carrying a cup', p: 'A: release unknown', r: 'A in service, would finish at 180 ms',
     n: 'The world moves one tick. The resource model is moved to the same time and asked what has finished. Nothing yet.'},
   {l: [4, 5, 6, 7], t: '100 ms', a: 'Waiting', b: 'Skill ended, needs a decision', p: 'A and B: release unknown', r: 'A and B share the GPU; A now finishes at 240 ms',
@@ -139,11 +139,11 @@ const STEPS = [
   {l: [8, 9], t: '300 ms', a: 'Waiting', b: 'Waiting', p: 'A: release at 300 ms. B: release unknown', r: 'A finished at 240 ms; B in service',
     n: 'Two more ticks. A finished at 240 ms. The next-tick rule rounds that up, so A’s release time is 300 ms.'},
   {l: [2, 3], t: '300 ms', a: 'New skill: go to the kitchen', b: 'Waiting', p: 'B: release unknown', r: 'B in service',
-    n: 'A’s reply is ready. It leaves the pending set and becomes A’s new skill. A waited 300 ms of simulated time.'},
+    n: 'A’s model output is released from the pending set and selects A’s next skill. A waited 300 ms of simulated time.'},
   {l: [8, 9, 2, 3], t: '400 ms', a: 'Going to the kitchen', b: 'New skill: place the cup', p: 'Empty', r: 'Idle',
     n: 'B finishes at 350 ms and is released at 400 ms in the same way.'},
   {l: [10, 11, 12], t: 'End', a: 'Task done, world removed', b: 'Task done, world removed', p: 'Dropped for finished worlds', r: 'Drained',
-    n: 'A world that completes its task or runs out of budget leaves the loop, and its pending replies are dropped. After the loop, leftover GPU work runs to completion so time and energy are counted in full.'}
+    n: 'A world that completes its task or runs out of budget leaves the loop, and its pending model outputs are discarded. After the loop, leftover GPU work runs to completion so time and energy are counted in full.'}
 ];
 function initLoop() {
   const lines = [...document.querySelectorAll('#code li')];
@@ -174,7 +174,7 @@ const SYNC = {
     {w: 0, m: 0, a: A180, n: 'Robot A asks at 0 ms. Alone, its request would take 180 ms.'},
     {w: 0, m: 180, a: A180, n: 'The hardware model runs A straight to its end, 180 ms, without waiting for the world.'},
     {w: 100, m: 180, a: A180, b: B280, bDone: 0, n: 'Robot B asks at 100 ms. A’s finish is already fixed, so B cannot slow it.'},
-    {w: 200, m: 200, a: A180, b: B280, relA: 200, n: 'A is released at 200 ms. In step with the world it is 300 ms: the reply arrives one tick too early.'}
+    {w: 200, m: 200, a: A180, b: B280, relA: 200, n: 'A is released at 200 ms. In step with the world it is 300 ms: the model output is released one tick too early.'}
   ]
 };
 function initSync() {
@@ -224,12 +224,12 @@ function initTick() {
     for (let k = 0; k * 1000 / hz <= 400 + 1e-9; k++) marks.append(el('line', {class: 'd-axis', x1: x(k * 1000 / hz), y1: 54, x2: x(k * 1000 / hz), y2: 70}));
     marks.append(el('line', {x1: x(finish), y1: 62, x2: x(applied), y2: 62, stroke: 'var(--teal)', 'stroke-width': 3}),
       el('circle', {cx: x(finish), cy: 62, r: 6, fill: 'var(--orange)'}), el('circle', {cx: x(applied), cy: 62, r: 6, fill: 'var(--teal)'}),
-      el('text', {class: 'd-lab', x: Math.min(Math.max(x(finish), 70), 570), y: 38, 'text-anchor': 'middle'}, 'reply ready'),
+      el('text', {class: 'd-lab', x: Math.min(Math.max(x(finish), 70), 570), y: 38, 'text-anchor': 'middle'}, 'inference complete'),
       el('text', {class: 'd-strong', x: Math.min(Math.max(x(applied), 70), 570), y: 92, 'text-anchor': 'middle'}, 'applied'));
     const wait = Math.round(applied - finish);
     $('tick-ms').textContent = `${Math.round(applied)} ms`;
-    $('tick-text').textContent = wait === 0 ? 'applied at once: the reply landed on a tick' : `applied, ${wait} ms after the reply was ready`;
-    $('tick-title').textContent = `Control ticks every ${Math.round(1000 / hz)} milliseconds. The reply is ready at ${finish} milliseconds and is applied at ${Math.round(applied)} milliseconds.`;
+    $('tick-text').textContent = wait === 0 ? 'applied immediately: modeled completion coincides with a control tick' : `applied, ${wait} ms after modeled completion`;
+    $('tick-title').textContent = `Control ticks every ${Math.round(1000 / hz)} milliseconds. Modeled inference completes at ${finish} milliseconds and the output is applied at ${Math.round(applied)} milliseconds.`;
   }
   group.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button) return;
