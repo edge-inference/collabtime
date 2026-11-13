@@ -1,20 +1,31 @@
 'use strict';
-const partnrVideo = document.querySelector('#partnr-video');
-const partnrSpeed = document.querySelector('#partnr-speed');
-function setPartnrSpeed() {
-  const rate = Number(partnrSpeed.value);
-  partnrVideo.defaultPlaybackRate = rate;
-  partnrVideo.playbackRate = rate;
+function bindChoices(selector, onSelect) {
+  const buttons = [...document.querySelectorAll(`${selector} button[data-value]`)];
+  function select(button) {
+    for (const option of buttons) {
+      option.setAttribute('aria-pressed', String(option === button));
+    }
+    onSelect(button.dataset.value);
+  }
+  for (const button of buttons) button.addEventListener('click', () => select(button));
+  select(buttons.find(button => button.getAttribute('aria-pressed') === 'true') || buttons[0]);
 }
-setPartnrSpeed();
+const partnrVideo = document.querySelector('#partnr-video');
+let partnrPlaybackRate = 1;
+function setPartnrSpeed() {
+  partnrVideo.defaultPlaybackRate = partnrPlaybackRate;
+  partnrVideo.playbackRate = partnrPlaybackRate;
+}
+bindChoices('#partnr-speed', value => {
+  partnrPlaybackRate = Number(value);
+  setPartnrSpeed();
+});
 partnrVideo.addEventListener('loadedmetadata', setPartnrSpeed);
-partnrSpeed.addEventListener('change', setPartnrSpeed);
 async function init() {
   const response = await fetch('results.json');
   if (!response.ok) throw new Error('Could not load the comparison data.');
   const {configurations} = await response.json();
   const baseline = configurations.find(c => c.id === 'timeslicing');
-  const selector = document.querySelector('#configuration');
   const descriptions = {
     priority: 'Brief action priority lowers latency and energy. Phase labels are not required for this configuration.',
     uniform: 'A uniform 250 ms budget performs similarly to action priority in this comparison.',
@@ -22,8 +33,8 @@ async function init() {
     mps: 'The 50% MPS limit permits higher System 2 throughput than action priority, at higher System 1 latency. It is not an equal-throughput comparison.',
     solo: 'System 1 alone is a task-success reference. It does not execute System 2, so its energy is not a matched co-execution comparison.'
   };
-  function render() {
-    const selected = configurations.find(c => c.id === selector.value);
+  function render(selectedId) {
+    const selected = configurations.find(c => c.id === selectedId);
     const metrics = [
       ['Action inference latency', 'latency_ms', 300, 'ms', 0],
       ['Task success', 'success_pct', 100, '%', 1],
@@ -60,6 +71,6 @@ async function init() {
     }
     document.querySelector('#result-table').append(tr);
   }
-  selector.addEventListener('change', render); render();
+  bindChoices('#configuration', render);
 }
 init().catch(error => { document.querySelector('#comparison-chart').textContent = error.message; });
