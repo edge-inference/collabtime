@@ -1,7 +1,7 @@
-#tolerance-interactive{--ct-ink:var(--ink);--ct-muted:var(--muted);--ct-paper:var(--paper);--ct-panel:#fff;--ct-axis:#a3afaf;--ct-blue:#386c9d;--ct-orange:#cf7027;--ct-teal:#38857f;--ct-purple:#806899;--ct-grey:#8b959e;font-family:Arial,Helvetica,sans-serif;color:var(--ct-ink)}
+#tolerance-interactive{--ct-ink:var(--ink);--ct-muted:var(--muted);--ct-paper:var(--paper);--ct-panel:#fff;--ct-axis:#a3afaf;--ct-blue:#386c9d;--ct-orange:#cf7027;--ct-teal:#38857f;--ct-purple:#806899;--ct-grey:#8b959e;font-family:Arial,Helvetica,sans-serif;color:var(--ct-ink);max-width:880px;margin-inline:auto}
     #tolerance-interactive .ct-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
     #tolerance-interactive .ct-panel{min-width:0;background:var(--ct-panel);padding:18px 16px 12px;border-radius:3px}
-    #tolerance-interactive h3{font-size:17px;line-height:1.4;font-weight:600;margin:0 0 5px}
+    #tolerance-interactive h3{font-size:17px;line-height:28px;min-height:30px;font-weight:600;margin:0 0 5px}
     #tolerance-interactive h3 span{font-weight:400;color:var(--ct-muted)}
     #tolerance-interactive .ct-pi{font-family:Georgia,serif;font-size:20px}
     #tolerance-interactive .ct-pi sub{font-size:15px;line-height:0;vertical-align:-.18em}
