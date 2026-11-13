@@ -1,0 +1,53 @@
+{
+  "scope": "400 matched LIBERO episodes, pi0.5 FP8 and Qwen3.5-9B NVFP4 on one Thor module. Latency is the average of four suite medians. Module energy includes idle power.",
+  "configurations": [
+    {
+      "id": "solo",
+      "label": "System 1 alone",
+      "latency_ms": 123,
+      "success_pct": 97.0,
+      "energy_j": 301
+    },
+    {
+      "id": "timeslicing",
+      "label": "GPU time slicing",
+      "latency_ms": 258,
+      "success_pct": 94.8,
+      "energy_j": 811
+    },
+    {
+      "id": "mps",
+      "label": "System 2 MPS limit: 50%",
+      "latency_ms": 237,
+      "success_pct": 95.8,
+      "energy_j": 811
+    },
+    {
+      "id": "priority",
+      "label": "Action priority",
+      "latency_ms": 141,
+      "success_pct": 97.0,
+      "energy_j": 707
+    },
+    {
+      "id": "uniform",
+      "label": "Uniform 250 ms budget",
+      "latency_ms": 141,
+      "success_pct": 97.8,
+      "energy_j": 704
+    },
+    {
+      "id": "phase",
+      "label": "Phase budgets",
+      "latency_ms": 248,
+      "success_pct": 95.3,
+      "energy_j": 789
+    }
+  ],
+  "replay": {
+    "workload": "LeKiwi with pi0.5",
+    "action_chunk_delay_ms": 133,
+    "closed_loop_loss_pct": 32,
+    "replay_loss_pct": 9
+  }
+}

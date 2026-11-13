@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="How the CollabTime timing model turns a hardware time into the moment a robot can act.">
+  <title>Timing model · CollabTime</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="model.css">
+  <script src="model.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="masthead"><a class="wordmark" href="index.html">Collab<span>Time</span><i aria-hidden="true"></i></a><nav aria-label="Main navigation"><a href="index.html">Overview</a><a href="#request">One request</a><a href="#shared">Shared server</a><a href="#loop">The loop</a><a href="#step">In step</a><a href="#scheduler">Scheduler</a></nav></header>
+<main id="main">
+<section class="page-hero">
+  <div><p class="eyebrow">Method · Timing model</p><h1>From a hardware time<br>to the robot’s<br><em>next move.</em></h1><p class="lead">For every inference request the model answers one question: when can the robot use the reply? Six replays show how that answer is built, how it reaches the simulated robot, and how the scheduler uses it. Play each one, pause it, or step through it.</p></div>
+  <ol class="toc" aria-label="On this page"><li><a href="#request"><span>01</span>One request: ready, start, finish</a></li><li><a href="#shared"><span>02</span>Many robots on one server</a></li><li><a href="#loop"><span>03</span>The loop that couples hardware and task</a></li><li><a href="#step"><span>04</span>Why the two clocks stay in step</a></li><li><a href="#tick"><span>05</span>From a finish time to an action</a></li><li><a href="#scheduler"><span>06</span>The scheduler that holds System 2</a></li></ol>
+</section>
+
+<section id="request" class="section">
+  <div class="section-heading"><p class="eyebrow">01 / One request</p><h2>Ready, start,<br>finish.</h2><p>Every piece of work gets three times. An inference, a prompt preparation and a message on the link are all handled the same way.</p></div>
+  <div class="explain">
+    <div class="prose">
+      <p><strong>Ready.</strong> A request is ready at the later of two events: its input has arrived, and every step it depends on has finished.</p>
+      <p><strong>Start.</strong> The resource that runs it decides when it may begin. That decision is the serving rule. It looks at the work already queued and at how much the resource can run at once.</p>
+      <p><strong>Finish.</strong> The start plus a predicted run time. The prediction comes from a cost model fitted to measurements of the target device.</p>
+      <div class="eq" role="group" aria-label="Equation 2 in words">
+        <div><span class="lab">ready</span> <var>q</var> = later of ( <var>a</var> , finish of earlier steps )</div>
+        <div><span class="lab">start</span> <var>s</var> = admit ( <var>q</var> , queue , capacity )</div>
+        <div><span class="lab">finish</span> <var>f</var> = <var>s</var> + predicted run time</div>
+      </div>
+      <p class="note">Equation 2 in the paper. A serving rule enters in the middle line: it decides which work the resource runs, and when.</p>
+    </div>
+    <figure class="panel">
+      <svg viewBox="0 0 640 246" role="img"><title>One request on a timeline: its input arrives, an earlier step finishes and makes it ready, it waits while the resource does other work, then it starts, runs and finishes.</title>
+        <text class="d-lab" x="0" y="34">Input</text><circle cx="140" cy="30" r="5" fill="var(--teal)"/>
+        <text class="d-lab" x="0" y="74">Earlier step</text><rect class="f-old" x="160" y="56" width="90" height="28" rx="2"/>
+        <text class="d-lab" x="0" y="130">Resource</text>
+        <rect class="f-s2" x="170" y="108" width="200" height="36" rx="2"/><text class="d-in" x="270" y="130" text-anchor="middle">Other work in the queue</text>
+        <rect class="f-s1" x="370" y="108" width="170" height="36" rx="2"/><text class="d-in" x="455" y="130" text-anchor="middle">This request runs</text>
+        <line class="d-guide" x1="140" y1="37" x2="140" y2="196"/><line class="d-guide" x1="250" y1="84" x2="250" y2="108"/><line class="d-guide" x1="250" y1="144" x2="250" y2="196"/><line class="d-guide" x1="370" y1="144" x2="370" y2="196"/><line class="d-guide" x1="540" y1="144" x2="540" y2="196"/>
+        <line x1="256" y1="172" x2="364" y2="172" stroke="var(--orange)" stroke-width="2"/><text class="d-lab" x="310" y="165" text-anchor="middle">wait</text>
+        <line x1="376" y1="172" x2="534" y2="172" stroke="var(--teal)" stroke-width="2"/><text class="d-lab" x="455" y="165" text-anchor="middle">predicted run time</text>
+        <text class="d-strong" x="140" y="214" text-anchor="middle">arrives</text><text class="d-sym" x="140" y="234" text-anchor="middle">a</text>
+        <text class="d-strong" x="250" y="214" text-anchor="middle">ready</text><text class="d-sym" x="250" y="234" text-anchor="middle">q</text>
+        <text class="d-strong" x="370" y="214" text-anchor="middle">start</text><text class="d-sym" x="370" y="234" text-anchor="middle">s</text>
+        <text class="d-strong" x="540" y="214" text-anchor="middle">finish</text><text class="d-sym" x="540" y="234" text-anchor="middle">f</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="explain second">
+    <div class="prose">
+      <h3>The serving rule moves the finish.</h3>
+      <p>One Thor module runs the action policy, System 1, and the reasoning model, System 2. The request is ready at the same moment in all three cases. Only the rule for sharing the GPU changes.</p>
+      <p>These three latencies are measured on the board, not predicted. The scheduler comparison runs the real scheduler on the real module and does not rely on the timing model.</p>
+      <p class="note" id="rule-scope">Measured action latency in the LIBERO comparison on one Thor module. The slices are drawn schematically.</p>
+    </div>
+    <div class="panel">
+      <div class="seg" role="group" aria-label="Serving rule">
+        <button type="button" data-rule="solo" aria-pressed="false">System 1 alone</button>
+        <button type="button" data-rule="timeslicing" aria-pressed="true">GPU time slicing</button>
+        <button type="button" data-rule="priority" aria-pressed="false">Action priority</button>
+      </div>
+      <svg id="rule-svg" viewBox="0 0 640 176" role="img" aria-labelledby="rule-title"><title id="rule-title">Timeline of one action request under the selected serving rule.</title>
+        <text class="d-lab" x="0" y="48">System 2</text><text class="d-lab" x="0" y="96">System 1</text>
+        <g id="rule-marks"></g>
+        <line class="d-axis" x1="130" y1="132" x2="610" y2="132"/>
+        <g id="rule-axis"></g>
+      </svg>
+      <p class="readout" aria-live="polite"><strong id="rule-ms">258 ms</strong><span id="rule-text">action latency under GPU time slicing</span></p>
+    </div>
+  </div>
+</section>
+
+<section id="shared" class="section">
+  <div class="section-heading"><p class="eyebrow">02 / Shared server</p><h2>Many robots,<br>one GPU pass.</h2><p>A reasoning server works in iterations. Each iteration carries a batch: some requests are reading their prompt, others are writing their answer.</p></div>
+  <div class="explain">
+    <div class="prose">
+      <p><strong>Start.</strong> An iteration starts at the later of two events: its batch has been formed, and the previous iteration has finished.</p>
+      <p><strong>Finish.</strong> The start plus the predicted time for that batch. The time depends on what the batch holds: how many requests, how many tokens, and which of them are reading or writing.</p>
+      <div class="eq" role="group" aria-label="Equation 3 in words">
+        <div><span class="lab">start</span> <var>s<sub>k</sub></var> = later of ( batch <var>k</var> formed , <var>f<sub>k−1</sub></var> )</div>
+        <div><span class="lab">finish</span> <var>f<sub>k</sub></var> = <var>s<sub>k</sub></var> + predicted time of batch <var>k</var></div>
+      </div>
+      <p class="note">Equation 3 in the paper. A request that joins late shares the pass with those already inside, which is why one robot’s wait depends on the others.</p>
+    </div>
+    <div class="panel">
+      <label class="slider" for="robots"><span>Robots in the batch</span><input id="robots" type="range" min="1" max="8" step="1" value="3"><output id="robots-out" for="robots">3</output></label>
+      <svg id="batch-svg" viewBox="0 0 640 232" role="img" aria-labelledby="batch-title"><title id="batch-title">Three GPU iterations in a row. The middle one grows with the number of robots in its batch.</title>
+        <text class="d-lab" x="0" y="34">Scheduler</text><circle cx="200" cy="30" r="5" fill="var(--teal)"/><text class="d-lab" x="212" y="34">batch k formed</text>
+        <text class="d-lab" x="0" y="98">GPU</text>
+        <rect class="f-old" x="140" y="76" width="110" height="36" rx="2"/><text class="d-strong" x="195" y="98" text-anchor="middle">k − 1</text>
+        <rect id="it-k" class="f-s1" x="250" y="76" width="126" height="36" rx="2"/><text id="it-k-t" class="d-in" x="313" y="98" text-anchor="middle">iteration k</text>
+        <rect id="it-n" class="f-old" x="376" y="76" width="90" height="36" rx="2"/><text id="it-n-t" class="d-strong" x="421" y="98" text-anchor="middle">k + 1</text>
+        <line class="d-guide" x1="200" y1="37" x2="200" y2="76"/><line class="d-guide" x1="250" y1="112" x2="250" y2="136"/><line id="it-end" class="d-guide" x1="376" y1="112" x2="376" y2="136"/>
+        <text class="d-strong" x="250" y="152" text-anchor="middle">start</text><text id="it-end-t" class="d-strong" x="376" y="152" text-anchor="middle">finish</text>
+        <text class="d-lab" x="0" y="200">In the batch</text><g id="chips"></g>
+      </svg>
+      <p class="chart-key"><span><i class="base-dot" style="background:var(--blue)"></i>writing its answer</span><span><i class="base-dot" style="background:var(--orange)"></i>reading its prompt</span><span>Schematic: bar lengths are not measurements</span></p>
+    </div>
+  </div>
+</section>
+
+<section id="loop" class="section">
+  <div class="section-heading"><p class="eyebrow">03 / The loop</p><h2>What the reply says,<br>and when it lands.</h2><p>The loop of Figure 4 couples the task simulator to the hardware model. It answers two questions with two different tools.</p></div>
+  <div class="two">
+    <div class="panel"><h3>What does the reply say?</h3><p>The real model answers, at once, on the simulation host. The time the host takes is ignored.</p></div>
+    <div class="panel"><h3>When may the robot use it?</h3><p>The resource model answers. It plays the target CPU, GPU and link from the two rules above, in simulated time. Until then the reply waits, locked.</p></div>
+  </div>
+  <div class="panel">
+    <div class="stepper">
+      <ol class="code" id="code" aria-label="Pseudocode of the loop">
+        <li>while worlds remain</li>
+        <li> P ← Complete(P, R.advance(t))</li>
+        <li> U ← Admit(U, P.PopReady(t))</li>
+        <li class="on"> (U, a, N) ← NativeStep(W, U, P, t)</li>
+        <li> X ← Capture(N); (Y, D) ← EvaluateModel(X)</li>
+        <li> for each robot r in N</li>
+        <li>  P[r] ← (Y, ∞); R.submit(r, t, D)</li>
+        <li> StepWorlds(W, a, Δ); t ← t + Δ</li>
+        <li> P ← Complete(P, R.advance(t))</li>
+        <li> F ← Finished(W, t); W ← W \ F</li>
+        <li> P ← Discard(P, F)</li>
+        <li>R.drain()</li>
+      </ol>
+      <dl class="state">
+        <div><dt>Clock t</dt><dd id="s-t"><strong>0 ms</strong></dd></div>
+        <div><dt>Robot A</dt><dd id="s-a">Skill ended, needs a decision</dd></div>
+        <div><dt>Robot B</dt><dd id="s-b">Carrying a cup</dd></div>
+        <div><dt>Pending P</dt><dd id="s-p">Empty</dd></div>
+        <div><dt>Resource R</dt><dd id="s-r">Idle</dd></div>
+      </dl>
+    </div>
+    <p class="step-note" id="step-note" aria-live="polite">Each robot runs its own skill for this tick. Robot A’s skill has just ended, so A joins N, the robots that need a decision.</p>
+    <div class="replay" id="loop-replay"><button type="button" data-act="restart">Restart</button><button type="button" data-act="back">Back</button><button type="button" data-act="play" class="primary">Play</button><button type="button" data-act="next">Step</button><span class="replay-pos">Step 1 of 9</span><span class="illus">Two robots, ticks of 100 ms. Illustrative numbers.</span></div>
+  </div>
+  <dl class="glossary">
+    <div><dt>t</dt><dd>The simulated clock. It advances one tick, Δ, per pass.</dd></div>
+    <div><dt>U</dt><dd>The skill each robot is executing now.</dd></div>
+    <div><dt>P</dt><dd>Replies already computed and not yet released. Each carries a release time.</dd></div>
+    <div><dt>R</dt><dd>The resource model: the queues and timing of the target hardware.</dd></div>
+    <div><dt>N</dt><dd>The robots that need a decision in this tick.</dd></div>
+    <div><dt>Y</dt><dd>The replies from the real model, one per robot in N.</dd></div>
+    <div><dt>D</dt><dd>What each request costs: its prompt and output lengths.</dd></div>
+    <div><dt>←</dt><dd>“Gets”: compute the right side and store it under the name on the left.</dd></div>
+  </dl>
+</section>
+
+<section id="step" class="section">
+  <div class="section-heading"><p class="eyebrow">04 / In step</p><h2>Two clocks,<br>one time.</h2><p>The world and the hardware model are two simulations. At every tick the hardware model is moved forward to the world’s time, and no further.</p></div>
+  <div class="explain">
+    <div class="prose">
+      <p><strong>Not ahead of the world.</strong> A request that arrives later can still slow one that arrived earlier. If the hardware model ran robot A’s request straight to its end, robot B’s request would arrive too late to count, and A would get its reply one tick too early. Switch the replay to “Running ahead” to see it.</p>
+      <p><strong>Not behind the world.</strong> A reply that is finished must reach its robot at the next tick, not later.</p>
+      <p>So a finish time is never fixed when a request arrives. It is settled tick by tick, as the world shows what else is asked.</p>
+    </div>
+    <div class="panel">
+      <div class="seg" role="group" aria-label="How the hardware model is driven">
+        <button type="button" data-mode="step" aria-pressed="true">In step with the world</button>
+        <button type="button" data-mode="ahead" aria-pressed="false">Running ahead</button>
+      </div>
+      <svg id="sync-svg" viewBox="0 0 640 246" role="img" aria-labelledby="sync-title"><title id="sync-title">Replay of two requests on a shared GPU, with the world clock and the hardware model clock.</title>
+        <text class="d-lab" x="0" y="76">Robot A</text><text class="d-lab" x="0" y="120">Robot B</text>
+        <rect id="a-proj" class="f-proj" x="120" y="58" width="176" height="28" rx="2"/>
+        <rect id="a-done" class="f-s1 grow" x="120" y="58" width="490" height="28"/>
+        <text id="a-end" class="d-lab halo" x="304" y="76">alone: 180 ms</text>
+        <rect id="b-proj" class="f-proj" x="218" y="102" width="245" height="28" rx="2"/>
+        <rect id="b-done" class="f-s1 grow" x="218" y="102" width="392" height="28"/>
+        <text id="b-end" class="d-lab halo" x="471" y="120">350 ms</text>
+        <line class="d-axis" x1="120" y1="166" x2="610" y2="166"/><g id="sync-axis"></g>
+        <g id="clock-model" class="slide"><line x1="0" y1="50" x2="0" y2="166" stroke="var(--orange)" stroke-width="2" stroke-dasharray="5 4"/><text x="0" y="210" text-anchor="middle" class="d-clock" fill="var(--orange)">hardware model</text></g>
+        <g id="clock-world" class="slide"><line x1="0" y1="42" x2="0" y2="166" stroke="var(--teal)" stroke-width="2"/><text x="0" y="32" text-anchor="middle" class="d-clock" fill="var(--teal)">world</text></g>
+        <g id="sync-released"></g>
+      </svg>
+      <p class="step-note" id="sync-note" aria-live="polite">Robot A asks at 0 ms. Alone, its request would take 180 ms.</p>
+      <div class="replay" id="sync-replay"><button type="button" data-act="restart">Restart</button><button type="button" data-act="back">Back</button><button type="button" data-act="play" class="primary">Play</button><button type="button" data-act="next">Step</button><span class="replay-pos">Step 1 of 9</span><span class="illus">Two robots, ticks of 100 ms. Illustrative numbers.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="tick" class="section">
+  <div class="section-heading"><p class="eyebrow">05 / Next tick</p><h2>A reply acts at<br>the next control tick.</h2><p>A robot applies commands on its control clock. A reply that finishes between two ticks waits for the next one.</p></div>
+  <div class="explain">
+    <div class="prose">
+      <div class="eq" role="group" aria-label="Equation 4 in words">
+        <div><span class="lab">acts at</span> the first tick at or after ( finish + dispatch delay )</div>
+      </div>
+      <p>Equation 4 in the paper. This rounding is the last step from a hardware time to a robot action. A faster control clock wastes less of a fast reply.</p>
+      <p class="note">The dispatch delay is zero in this picture.</p>
+    </div>
+    <div class="panel">
+      <div class="seg" role="group" aria-label="Control rate">
+        <button type="button" data-hz="10" aria-pressed="false">10 Hz</button>
+        <button type="button" data-hz="20" aria-pressed="true">20 Hz</button>
+        <button type="button" data-hz="30" aria-pressed="false">30 Hz</button>
+        <button type="button" data-hz="60" aria-pressed="false">60 Hz</button>
+      </div>
+      <label class="slider" for="finish"><span>Reply finishes at</span><input id="finish" type="range" min="0" max="400" step="1" value="137"><output id="finish-out" for="finish">137 ms</output></label>
+      <svg id="tick-svg" viewBox="0 0 640 118" role="img" aria-labelledby="tick-title"><title id="tick-title">A time axis with control ticks. The reply finishes between two ticks and is applied at the next one.</title>
+        <line class="d-axis" x1="40" y1="62" x2="600" y2="62"/><g id="tick-marks"></g>
+        <text class="d-lab" x="40" y="104" text-anchor="middle">0</text><text class="d-lab" x="600" y="104" text-anchor="middle">400 ms</text>
+      </svg>
+      <p class="readout" aria-live="polite"><strong id="tick-ms">150 ms</strong><span id="tick-text">applied, 13 ms after the reply was ready</span></p>
+    </div>
+  </div>
+  <aside class="interpretation"><strong>How the model is checked</strong><p>The native co-execution tests replace the modeled finish time with replies from the physical device: the simulator advances at the command cadence while inference runs on Thor. That separates a measured benefit of an allocation from a prediction of the timing model. <a class="inline" href="index.html#findings">See the findings</a>.</p></aside>
+</section>
+<section id="scheduler" class="section">
+  <div class="section-heading"><p class="eyebrow">06 / Scheduler</p><h2>Hold System 2 only<br>as long as needed.</h2><p>On one module the two models share a GPU. For each action inference the scheduler decides whether System 2 must wait, and for how long.</p></div>
+  <div class="explain">
+    <div class="prose">
+      <p><strong>Estimate.</strong> The scheduler keeps two running estimates of the action latency: with System 2 free, and with System 2 held.</p>
+      <p><strong>Compare.</strong> The target is 0.8 of the latency budget. If the free estimate is within the target, System 2 keeps running.</p>
+      <p><strong>Hold.</strong> Otherwise System 2 is suspended for a share of the action inference. The share grows as the free estimate rises above the target. A full hold lasts until the action completes.</p>
+      <div class="eq" role="group" aria-label="Equation 5 in words">
+        <div><span class="lab">share</span> <var>f</var> = ( free − 0.8 × budget ) ÷ ( free − held ) + <var>b</var></div>
+        <div><span class="lab">hold</span> <var>f</var> × held, with <var>f</var> kept between 0 and 1</div>
+      </div>
+      <p class="note">Equation 5 in the paper. The term <var>b</var> corrects the error seen under partial holds. This is a feedback heuristic, not a worst-case timing bound. A hold suspends the System 2 process and keeps its model in memory; GPU work already submitted still finishes.</p>
+      <p>The measured outcomes sit under the replay. With the 250 ms budget the action latency came out the same as with always prioritizing. The looser phase budgets returned it toward time slicing.</p>
+    </div>
+    <div class="panel">
+      <div class="seg" role="group" aria-label="Budget">
+        <button type="button" data-budget="always" aria-pressed="false">Always prioritize</button>
+        <button type="button" data-budget="250" aria-pressed="true">250 ms budget</button>
+        <button type="button" data-budget="300" aria-pressed="false">300 ms</button>
+        <button type="button" data-budget="450" aria-pressed="false">450 ms</button>
+      </div>
+      <label class="slider" for="budget"><span>Latency budget</span><input id="budget" type="range" min="150" max="500" step="5" value="250"><output id="budget-out" for="budget">250 ms</output></label>
+      <svg id="sched-svg" viewBox="0 0 640 176" role="img" aria-labelledby="sched-title"><title id="sched-title">Replay of one action inference under the scheduler.</title>
+        <text class="d-lab" x="0" y="48">System 2</text><text class="d-lab" x="0" y="96">System 1</text>
+        <g id="sched-marks"></g>
+        <line class="d-axis" x1="130" y1="132" x2="610" y2="132"/><g id="sched-axis"></g>
+        <g id="sched-head" class="slide"><line x1="0" y1="18" x2="0" y2="132" stroke="var(--ink)" stroke-width="1.5"/></g>
+      </svg>
+      <p class="readout" aria-live="polite"><strong id="sched-f">50% hold</strong><span id="sched-text">70 ms of each action inference; the rule aims at 200 ms</span></p>
+      <p class="step-note short" id="sched-note" aria-live="polite">An action request arrives.</p>
+      <div class="replay" id="sched-replay"><button type="button" data-act="restart">Restart</button><button type="button" data-act="back">Back</button><button type="button" data-act="play" class="primary">Play</button><button type="button" data-act="next">Step</button><span class="replay-pos">Step 1 of 4</span></div>
+      <p class="note" id="sched-scope">The two estimates are set to the measured medians of the LIBERO comparison, and the correction term is zero. The target is what the rule aims for, not a measurement.</p>
+      <dl class="measured" id="sched-measured" aria-label="Measured action latency in the LIBERO comparison"></dl>
+    </div>
+  </div>
+</section>
+<footer><a class="wordmark" href="index.html">Collab<span>Time</span></a><p>CollabTime · November 2026<br><a href="https://github.com/edge-inference/collabtime">Website source</a></p><a href="#main">Back to top ↑</a></footer>
+</main>
+</body></html>
