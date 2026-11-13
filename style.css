@@ -50,3 +50,8 @@
 
 .data-details h4{margin:0;font-size:14px;font-weight:600}
 .data-details tr.highlight td:first-child{font-weight:600}
+
+.workload-grid img.workload-frame{height:auto;aspect-ratio:1.6;object-fit:contain;background:#eceeeb}
+.workload-grid img.aloha-frame{background:#000}
+.workload-grid .media-credit{display:inline-block;margin-top:5px;color:var(--teal);font-size:11px;line-height:1.5}
+.workload-grid .media-credit:hover{text-decoration:underline}

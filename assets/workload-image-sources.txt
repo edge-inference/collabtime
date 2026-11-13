@@ -1,0 +1,34 @@
+Workload image sources
+
+LIBERO: CollabTime pi0.5 LIBERO-Spatial reference evaluation, task 0,
+initial condition 0. Final simulation frame; bowl placement.
+
+ALOHA: LeRobot aloha_sim_transfer_cube_scripted, episode 0, frame at 4 s.
+https://huggingface.co/datasets/lerobot/aloha_sim_transfer_cube_scripted
+Revision: 5c8606bd543c6160fb92a72e1cd918b0bf806c1e
+This dataset revision declares the MIT license:
+https://huggingface.co/datasets/lerobot/aloha_sim_transfer_cube_scripted/blob/5c8606bd543c6160fb92a72e1cd918b0bf806c1e/README.md
+The frame illustrates a scripted demonstration, not a CollabTime policy run.
+
+MIT License
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+BEHAVIOR-1K: official turning_on_radio demonstration thumbnail, video
+1109198872, published by BEHAVIOR. The image illustrates the benchmark task,
+not a CollabTime policy run.
+https://behavior.stanford.edu/challenge/archive/2025/tasks/00_turning_on_radio.html
+https://vimeo.com/1109198872
