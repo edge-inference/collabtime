@@ -103,10 +103,10 @@
 </section>
 
 <section id="loop" class="section">
-  <div class="section-heading"><p class="eyebrow">03 / The loop</p><h2>Model output and<br>when the robot can use it.</h2><p>The loop of Figure 4 couples the task simulator to the hardware model. Model inference determines the output; hardware modeling determines when it becomes available to the robot.</p></div>
+  <div class="section-heading"><p class="eyebrow">03 / The loop</p><h2>System 2 decisions and<br>when robots can use them.</h2><p>The loop of Figure 4 couples the task simulator to the hardware model. In this example, System 2 generates each decision; hardware modeling determines when the robot can use it.</p></div>
   <div class="two">
-    <div class="panel"><h3>What does the model produce?</h3><p>Actual inference runs on the simulation host to produce the model output. Host execution time does not advance simulated time.</p></div>
-    <div class="panel"><h3>When may the robot use it?</h3><p>The resource model simulates the target CPU, GPU and link. The output remains pending until its modeled release time.</p></div>
+    <div class="panel"><h3>Which decision does System 2 generate?</h3><p>System 2 inference runs on the simulation host to generate the decision. Host execution time does not advance simulated time.</p></div>
+    <div class="panel"><h3>When may the robot use it?</h3><p>The resource model simulates the target CPU, GPU and link. The decision remains pending until its modeled release time.</p></div>
   </div>
   <div class="panel">
     <div class="stepper">
@@ -138,10 +138,10 @@
   <dl class="glossary">
     <div><dt>t</dt><dd>The simulated clock. It advances one tick, Δ, per pass.</dd></div>
     <div><dt>U</dt><dd>The skill each robot is executing now.</dd></div>
-    <div><dt>P</dt><dd>Model outputs already computed and not yet released. Each carries a release time.</dd></div>
+    <div><dt>P</dt><dd>System 2 decisions already computed and not yet released. Each carries a release time.</dd></div>
     <div><dt>R</dt><dd>The resource model: the queues and timing of the target hardware.</dd></div>
-    <div><dt>N</dt><dd>The robots that need a decision in this tick.</dd></div>
-    <div><dt>Y</dt><dd>The model outputs, one per robot in N.</dd></div>
+    <div><dt>N</dt><dd>The robots that need a System 2 decision in this tick.</dd></div>
+    <div><dt>Y</dt><dd>The System 2 decisions, one per robot in N.</dd></div>
     <div><dt>D</dt><dd>What each request costs: its prompt and output lengths.</dd></div>
     <div><dt>←</dt><dd>“Gets”: compute the right side and store it under the name on the left.</dd></div>
   </dl>

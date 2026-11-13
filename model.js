@@ -129,9 +129,9 @@ const STEPS = [
   {l: [4], t: '0 ms', a: 'Skill ended, needs a decision', b: 'Carrying a cup', p: 'Empty', r: 'Idle',
     n: 'Each robot runs its own skill for this tick. Robot A’s skill has just ended, so A joins N, the robots that need a decision.'},
   {l: [5], t: '0 ms', a: 'Waiting', b: 'Carrying a cup', p: 'Empty', r: 'Idle',
-    n: 'Inference runs on the simulation host using A’s image and prompt. It produces the model output Y, “go to the kitchen”, and resource demand D: 800 prompt tokens and 40 output tokens. Simulated time does not advance during host inference.'},
+    n: 'Inference runs on the simulation host using A’s image and prompt. It produces the System 2 decision Y, “go to the kitchen”, and resource demand D: 800 prompt tokens and 40 output tokens. Simulated time does not advance during host inference.'},
   {l: [6, 7], t: '0 ms', a: 'Waiting', b: 'Carrying a cup', p: 'A: go to the kitchen, release unknown', r: 'A in service',
-    n: 'The model output is stored in the pending set. Its release time is initially infinity, so the robot cannot use it yet. The resource model receives the request’s demand to simulate execution on the target hardware.'},
+    n: 'The System 2 decision is stored in the pending set. Its release time is initially infinity, so the robot cannot use it yet. The resource model receives the request’s demand to simulate execution on the target hardware.'},
   {l: [8, 9], t: '100 ms', a: 'Waiting', b: 'Carrying a cup', p: 'A: release unknown', r: 'A in service, would finish at 180 ms',
     n: 'The world moves one tick. The resource model is moved to the same time and asked what has finished. Nothing yet.'},
   {l: [4, 5, 6, 7], t: '100 ms', a: 'Waiting', b: 'Skill ended, needs a decision', p: 'A and B: release unknown', r: 'A and B share the GPU; A now finishes at 240 ms',
@@ -139,11 +139,11 @@ const STEPS = [
   {l: [8, 9], t: '300 ms', a: 'Waiting', b: 'Waiting', p: 'A: release at 300 ms. B: release unknown', r: 'A finished at 240 ms; B in service',
     n: 'Two more ticks. A finished at 240 ms. The next-tick rule rounds that up, so A’s release time is 300 ms.'},
   {l: [2, 3], t: '300 ms', a: 'New skill: go to the kitchen', b: 'Waiting', p: 'B: release unknown', r: 'B in service',
-    n: 'A’s model output is released from the pending set and selects A’s next skill. A waited 300 ms of simulated time.'},
+    n: 'A’s System 2 decision is released from the pending set and selects A’s next skill. A waited 300 ms of simulated time.'},
   {l: [8, 9, 2, 3], t: '400 ms', a: 'Going to the kitchen', b: 'New skill: place the cup', p: 'Empty', r: 'Idle',
     n: 'B finishes at 350 ms and is released at 400 ms in the same way.'},
   {l: [10, 11, 12], t: 'End', a: 'Task done, world removed', b: 'Task done, world removed', p: 'Dropped for finished worlds', r: 'Drained',
-    n: 'A world that completes its task or runs out of budget leaves the loop, and its pending model outputs are discarded. After the loop, leftover GPU work runs to completion so time and energy are counted in full.'}
+    n: 'A world that completes its task or runs out of budget leaves the loop, and its pending System 2 decisions are discarded. After the loop, leftover GPU work runs to completion so time and energy are counted in full.'}
 ];
 function initLoop() {
   const lines = [...document.querySelectorAll('#code li')];
