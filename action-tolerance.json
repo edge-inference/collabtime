@@ -1,0 +1,655 @@
+{
+  "schemaVersion": 1,
+  "xLabel": "Action chunk delay (ms)",
+  "workloads": [
+    {
+      "key": "fetch",
+      "title": "Fetch · SmolVLA",
+      "yLabel": "Picks per episode",
+      "xDomain": [
+        -15,
+        415
+      ],
+      "xMax": 400,
+      "yDomain": [
+        -0.12,
+        3.6
+      ],
+      "series": [
+        {
+          "key": "nav",
+          "category": "navigate",
+          "label": "Navigate",
+          "points": [
+            {
+              "x": 0,
+              "y": 3.094,
+              "plans": 32
+            },
+            {
+              "x": 100,
+              "y": 2.875,
+              "plans": 32
+            },
+            {
+              "x": 200,
+              "y": 2.875,
+              "plans": 32
+            },
+            {
+              "x": 300,
+              "y": 3.031,
+              "plans": 32
+            },
+            {
+              "x": 400,
+              "y": 2.531,
+              "plans": 32
+            }
+          ]
+        },
+        {
+          "key": "pick",
+          "category": "grasp",
+          "label": "Grasp",
+          "points": [
+            {
+              "x": 0,
+              "y": 3.094,
+              "plans": 32
+            },
+            {
+              "x": 50,
+              "y": 2.219,
+              "plans": 32
+            },
+            {
+              "x": 100,
+              "y": 1.406,
+              "plans": 32
+            },
+            {
+              "x": 150,
+              "y": 0.531,
+              "plans": 32
+            },
+            {
+              "x": 200,
+              "y": 0.281,
+              "plans": 32
+            },
+            {
+              "x": 300,
+              "y": 0.062,
+              "plans": 32
+            },
+            {
+              "x": 400,
+              "y": 0.031,
+              "plans": 32
+            }
+          ]
+        },
+        {
+          "key": "all",
+          "category": "every",
+          "label": "Every skill",
+          "points": [
+            {
+              "x": 0,
+              "y": 3.094,
+              "plans": 32
+            },
+            {
+              "x": 50,
+              "y": 2.469,
+              "plans": 32
+            },
+            {
+              "x": 100,
+              "y": 1.531,
+              "plans": 32
+            },
+            {
+              "x": 150,
+              "y": 0.562,
+              "plans": 32
+            },
+            {
+              "x": 200,
+              "y": 0.406,
+              "plans": 32
+            },
+            {
+              "x": 300,
+              "y": 0.094,
+              "plans": 32
+            },
+            {
+              "x": 400,
+              "y": 0.0,
+              "plans": 32
+            }
+          ]
+        }
+      ],
+      "sampleNote": "32 matched plans per setting."
+    },
+    {
+      "key": "lekiwi",
+      "title": "LeKiwi · π₀.₅",
+      "yLabel": "Objects sorted per layout",
+      "xDomain": [
+        -13.335,
+        280.035
+      ],
+      "xMax": 266.7,
+      "yDomain": [
+        0,
+        3.5
+      ],
+      "series": [
+        {
+          "key": "go",
+          "category": "navigate",
+          "label": "To object",
+          "points": [
+            {
+              "x": 0,
+              "y": 2.75,
+              "tasks": 112
+            },
+            {
+              "x": 66.66666666666667,
+              "y": 2.9732,
+              "tasks": 112
+            },
+            {
+              "x": 266.6666666666667,
+              "y": 2.6875,
+              "tasks": 112
+            }
+          ]
+        },
+        {
+          "key": "pick",
+          "category": "grasp",
+          "label": "Grasp",
+          "points": [
+            {
+              "x": 0,
+              "y": 2.75,
+              "tasks": 112
+            },
+            {
+              "x": 66.66666666666667,
+              "y": 2.9018,
+              "tasks": 112
+            },
+            {
+              "x": 266.6666666666667,
+              "y": 2.7411,
+              "tasks": 112
+            }
+          ]
+        },
+        {
+          "key": "bring",
+          "category": "transport",
+          "label": "Carry to bin",
+          "points": [
+            {
+              "x": 0,
+              "y": 2.75,
+              "tasks": 112
+            },
+            {
+              "x": 66.66666666666667,
+              "y": 2.1875,
+              "tasks": 112
+            },
+            {
+              "x": 133.33333333333334,
+              "y": 2.0625,
+              "tasks": 112
+            },
+            {
+              "x": 266.6666666666667,
+              "y": 1.8214,
+              "tasks": 112
+            }
+          ]
+        },
+        {
+          "key": "put",
+          "category": "place",
+          "label": "Place",
+          "points": [
+            {
+              "x": 0,
+              "y": 2.75,
+              "tasks": 112
+            },
+            {
+              "x": 66.66666666666667,
+              "y": 2.7768,
+              "tasks": 112
+            },
+            {
+              "x": 266.6666666666667,
+              "y": 2.6696,
+              "tasks": 112
+            }
+          ]
+        },
+        {
+          "key": "all",
+          "category": "every",
+          "label": "Every skill",
+          "points": [
+            {
+              "x": 0,
+              "y": 2.75,
+              "tasks": 112
+            },
+            {
+              "x": 66.7,
+              "y": 2.1071,
+              "tasks": 112
+            },
+            {
+              "x": 133.3,
+              "y": 1.9821,
+              "tasks": 112
+            },
+            {
+              "x": 266.7,
+              "y": 1.6071,
+              "tasks": 112
+            }
+          ]
+        }
+      ],
+      "sampleNote": "112 matched tasks. Every skill uses the same cohort and zero-delay runs."
+    },
+    {
+      "key": "libero",
+      "title": "LIBERO · π₀.₅",
+      "yLabel": "Task success (%)",
+      "xDomain": [
+        -22.5,
+        472.5
+      ],
+      "xMax": 450,
+      "yDomain": [
+        0,
+        105
+      ],
+      "series": [
+        {
+          "key": "all",
+          "category": "every",
+          "label": "Every phase",
+          "points": [
+            {
+              "x": 0,
+              "y": 95.25
+            },
+            {
+              "x": 100,
+              "y": 96.0
+            },
+            {
+              "x": 200,
+              "y": 96.75
+            },
+            {
+              "x": 300,
+              "y": 93.75
+            },
+            {
+              "x": 450,
+              "y": 78.25
+            }
+          ]
+        },
+        {
+          "key": "reach",
+          "category": "reach",
+          "label": "Reach only",
+          "points": [
+            {
+              "x": 0,
+              "y": 95.25
+            },
+            {
+              "x": 100,
+              "y": 96.75
+            },
+            {
+              "x": 200,
+              "y": 97.0
+            },
+            {
+              "x": 300,
+              "y": 97.0
+            },
+            {
+              "x": 450,
+              "y": 92.25
+            }
+          ]
+        },
+        {
+          "key": "place",
+          "category": "place",
+          "label": "Place only",
+          "points": [
+            {
+              "x": 0,
+              "y": 95.25
+            },
+            {
+              "x": 100,
+              "y": 97.5
+            },
+            {
+              "x": 200,
+              "y": 97.25
+            },
+            {
+              "x": 300,
+              "y": 96.75
+            },
+            {
+              "x": 450,
+              "y": 97.5
+            }
+          ]
+        }
+      ],
+      "sampleNote": "Full late chunks, buffered execution; plotted series: Every phase, Reach only, Place only."
+    },
+    {
+      "key": "behavior",
+      "title": "BEHAVIOR · π₀.₅",
+      "yLabel": "Task success (%)",
+      "xDomain": [
+        -15,
+        415
+      ],
+      "xMax": 400,
+      "yDomain": [
+        0,
+        105
+      ],
+      "series": [
+        {
+          "key": "all",
+          "category": "every",
+          "label": "Every phase",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20
+            },
+            {
+              "x": 100,
+              "y": 35.0,
+              "successes": 21,
+              "rollouts": 60,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 31.66666666666667,
+              "successes": 19,
+              "rollouts": 60,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 21.66666666666667,
+              "successes": 13,
+              "rollouts": 60,
+              "instances": 20
+            },
+            {
+              "x": 333,
+              "y": 6.666666666666667,
+              "successes": 4,
+              "rollouts": 60,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 5.0,
+              "successes": 3,
+              "rollouts": 60,
+              "instances": 20
+            }
+          ]
+        },
+        {
+          "key": "navigate",
+          "category": "navigate",
+          "label": "Navigate",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20,
+              "sharedBaseline": true
+            },
+            {
+              "x": 100,
+              "y": 55.00000000000001,
+              "successes": 11,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 45.0,
+              "successes": 9,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 55.00000000000001,
+              "successes": 11,
+              "rollouts": 20,
+              "instances": 20
+            }
+          ]
+        },
+        {
+          "key": "reach",
+          "category": "reach",
+          "label": "Reach",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20,
+              "sharedBaseline": true
+            },
+            {
+              "x": 100,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 30.0,
+              "successes": 6,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            }
+          ]
+        },
+        {
+          "key": "grasp",
+          "category": "grasp",
+          "label": "Grasp",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20,
+              "sharedBaseline": true
+            },
+            {
+              "x": 100,
+              "y": 40.0,
+              "successes": 8,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 55.00000000000001,
+              "successes": 11,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 55.00000000000001,
+              "successes": 11,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 25.0,
+              "successes": 5,
+              "rollouts": 20,
+              "instances": 20
+            }
+          ]
+        },
+        {
+          "key": "transport",
+          "category": "transport",
+          "label": "Transport",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20,
+              "sharedBaseline": true
+            },
+            {
+              "x": 100,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 45.0,
+              "successes": 9,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 45.0,
+              "successes": 9,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 40.0,
+              "successes": 8,
+              "rollouts": 20,
+              "instances": 20
+            }
+          ]
+        },
+        {
+          "key": "place",
+          "category": "place",
+          "label": "Place",
+          "points": [
+            {
+              "x": 0,
+              "y": 43.33333333333333,
+              "successes": 26,
+              "rollouts": 60,
+              "instances": 20,
+              "sharedBaseline": true
+            },
+            {
+              "x": 100,
+              "y": 25.0,
+              "successes": 5,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 167,
+              "y": 35.0,
+              "successes": 7,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 267,
+              "y": 55.00000000000001,
+              "successes": 11,
+              "rollouts": 20,
+              "instances": 20
+            },
+            {
+              "x": 400,
+              "y": 45.0,
+              "successes": 9,
+              "rollouts": 20,
+              "instances": 20
+            }
+          ]
+        }
+      ],
+      "sampleNote": "20 test instances. Every phase: 60 rollouts per point. Individual phases: 20 per nonzero point, sharing the 60-rollout zero-delay baseline."
+    }
+  ]
+}

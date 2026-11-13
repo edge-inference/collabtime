@@ -8,7 +8,9 @@
   <meta name="author" content="Benjamin Kubwimana, Jenny Huang, Pierluigi Nuzzo">
   <link rel="canonical" href="https://edge-inference.github.io/collabtime/">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="action-tolerance.css">
   <script src="app.js" defer></script>
+  <script src="action-tolerance.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -38,8 +40,8 @@
   <article id="action-delay" class="tolerance-finding">
     <div class="tolerance-heading"><div><span class="number">B</span><h3>How long can<br>an action wait?</h3></div><p>Delaying an action chunk has different consequences across skills and policies. Fetch is most sensitive during grasping; LeKiwi is most sensitive while carrying. LIBERO can continue executing buffered commands while waiting.</p></div>
     <figure class="tolerance-chart">
-      <p class="figure-scroll-hint">Swipe to view all four workloads.</p>
-      <div class="tolerance-scroll" tabindex="0" role="region" aria-label="Figure 8: action delay tolerance; scroll horizontally on small screens"><a href="assets/figures/action-tolerance.png" target="_blank" rel="noopener" aria-label="Open Figure 8 at full resolution"><img src="assets/figures/action-tolerance.png" width="2400" height="717" loading="lazy" alt="Four plots show task performance as action chunk delay increases in Fetch with SmolVLA, LeKiwi with pi zero point five, LIBERO with pi zero point five, and BEHAVIOR with pi zero point five. Curves separate delays in individual skills or phases from delays throughout execution. Fetch grasping and LeKiwi carrying are especially sensitive; LIBERO tolerates moderate delays while executing its buffer."></a></div>
+      <div id="tolerance-interactive" aria-label="Action chunk delay and task performance" hidden></div>
+      <div class="tolerance-static tolerance-scroll" tabindex="0" role="region" aria-label="Figure 8: action delay tolerance"><a href="assets/figures/action-tolerance.png" target="_blank" rel="noopener" aria-label="Open Figure 8 at full resolution"><img src="assets/figures/action-tolerance.png" width="2400" height="717" loading="lazy" alt="Four plots show task performance as action chunk delay increases in Fetch with SmolVLA, LeKiwi with pi zero point five, LIBERO with pi zero point five, and BEHAVIOR with pi zero point five. Curves separate delays in individual skills or phases from delays throughout execution. Fetch grasping and LeKiwi carrying are especially sensitive; LIBERO tolerates moderate delays while executing its buffer."></a></div>
       <figcaption><strong>Figure 8 · Action-delay tolerance.</strong> Delay postpones a new System 1 action chunk in the named skill or phase; “Every” applies throughout execution. Zero means no imposed delay.</figcaption>
     </figure>
   </article>

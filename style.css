@@ -23,21 +23,21 @@
 .humanoid-icon .robot-joint{fill:var(--ink)}
 .humanoid-icon .robot-neck{stroke:var(--ink);stroke-width:2;stroke-linecap:round}
 
-/* The manuscript figure keeps its original axes and values at a readable size. */
+/* Action-delay findings, with the manuscript image retained as a fallback. */
 .tolerance-finding{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:45px 0;margin-bottom:10px;scroll-margin-top:30px}
 .tolerance-heading{display:grid;grid-template-columns:1fr 1.13fr;gap:85px;align-items:center;margin-bottom:28px}
 .tolerance-heading h3{font-size:29px;font-weight:500;line-height:1.2;letter-spacing:-.6px}
 .tolerance-heading p{font-size:15px;line-height:1.7;color:var(--muted)}
-.tolerance-chart{background:#fff;border:1px solid var(--line);border-radius:3px;padding:24px 20px 18px}
+.tolerance-chart{padding:0}
 .tolerance-scroll{overflow-x:auto}.tolerance-scroll a{display:block;min-width:880px}.tolerance-scroll img{display:block;width:100%;height:auto}
 .tolerance-scroll:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
 .tolerance-chart figcaption{margin:18px 4px 0;font-size:12px;line-height:1.7;color:var(--muted)}
 .tolerance-chart figcaption strong{color:var(--ink)}.tolerance-chart figcaption a{color:var(--teal);white-space:nowrap;margin-left:6px}
 .tolerance-details{padding-top:16px;font-size:12px;color:var(--muted)}.tolerance-details summary{font-size:12px;color:var(--ink)}.tolerance-details p{margin-top:10px;max-width:950px;line-height:1.7}
-@media(max-width:900px){.tolerance-heading{gap:35px}.tolerance-chart{padding:20px 12px}}
+@media(max-width:900px){.tolerance-heading{gap:35px}}
 @media(max-width:600px){.tolerance-heading{grid-template-columns:1fr;gap:18px}.tolerance-finding{padding:30px 0}.tolerance-chart figcaption{margin-top:14px}}
 
-.figure-scroll-hint{display:none}@media(max-width:900px){.figure-scroll-hint{display:block;font-size:12px;color:var(--muted);margin:0 4px 14px}}
+
 
 /* Inline choices keep every configuration visible. */
 .choice-control{border:0;padding:0;margin:0;min-width:0}
