@@ -65,7 +65,7 @@ async function init() {
     document.querySelector('#comparison-note').textContent = descriptions[selected.id];
   }
   for (const c of configurations) {
-    const tr = document.createElement('tr'); if (c.id === 'priority') tr.className='highlight';
+    const tr = document.createElement('tr'); if (c.id === 'priority' || c.id === 'uniform') tr.className='highlight';
     for (const v of [c.label, c.latency_ms, c.success_pct.toFixed(1), c.energy_j]) {
       const td=document.createElement('td'); td.textContent=v; tr.append(td);
     }

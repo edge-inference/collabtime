@@ -47,3 +47,6 @@
 .choice-buttons button:hover{border-color:var(--teal);background:#edf3f1}
 .choice-buttons button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:white}
 .choice-control.playback-control{display:block;margin-top:15px}
+
+.data-details h4{margin:0;font-size:14px;font-weight:600}
+.data-details tr.highlight td:first-child{font-weight:600}
