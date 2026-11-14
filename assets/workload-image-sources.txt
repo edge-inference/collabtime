@@ -1,34 +1,63 @@
 Workload image sources
 
-LIBERO: CollabTime pi0.5 LIBERO-Spatial reference evaluation, task 0,
-initial condition 0. Final simulation frame; bowl placement.
+The LIBERO, ALOHA and BEHAVIOR-1K images are 1600x1000 stills made for this
+website on 2026-11-13 from CollabTime policy runs. They illustrate the
+workloads. They are not images of the Thor scheduling comparison.
 
-ALOHA: LeRobot aloha_sim_transfer_cube_scripted, episode 0, frame at 4 s.
-https://huggingface.co/datasets/lerobot/aloha_sim_transfer_cube_scripted
-Revision: 5c8606bd543c6160fb92a72e1cd918b0bf806c1e
-This dataset revision declares the MIT license:
-https://huggingface.co/datasets/lerobot/aloha_sim_transfer_cube_scripted/blob/5c8606bd543c6160fb92a72e1cd918b0bf806c1e/README.md
-The frame illustrates a scripted demonstration, not a CollabTime policy run.
+LIBERO: CollabTime pi0.5 run of LIBERO-Spatial task 0, initial condition 0,
+seed 7; the episode succeeds. The policy ran unmodified on its 256x256
+observations while the simulator state was logged after each step. The image
+is that logged state drawn again with the scene's own side-view camera (field
+of view narrowed to 31 degrees) at 2560x1600 with 8x multisampling, then
+reduced. It shows the bowl held just above the plate, six steps before the
+episode ends in success.
 
-MIT License
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+ALOHA: CollabTime pi0 run of gym-aloha AlohaTransferCube-v0, seed 18; the
+episode succeeds. The image is the last step of that episode's logged joint
+trajectory, drawn with the ALOHA 2 model from MuJoCo Menagerie because the
+gym-aloha scene defines no materials. It is not the scene the policy
+observed. Arm joint angles and the cube pose are copied unchanged; gripper
+link positions agree with the gym-aloha model within 0.003 mm. The ALOHA 2
+fingers are 7.6 mm shorter, so the left finger ends 5.5 mm short of the cube
+it touches in gym-aloha. The view is from the far side of the table, so the
+robot's right arm is on the left of the image.
+https://github.com/google-deepmind/mujoco_menagerie/tree/370c43965323c0944b433b202aac5058b5f907a9/aloha
+The ALOHA 2 model is distributed under the BSD 3-Clause License:
 
-BEHAVIOR-1K: official turning_on_radio demonstration thumbnail, video
-1109198872, published by BEHAVIOR. The image illustrates the benchmark task,
-not a CollabTime policy run.
+Copyright (c) 2023, Trossen Robotics
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+BEHAVIOR-1K: CollabTime rollout of the pi0.5 policy on turning_on_radio,
+public test instance 0, scene house_double_floor_lower, R1Pro robot, in
+OmniGibson with no imposed delay. Third-person viewer camera at 2560x1440,
+cropped to 16:10 and reduced; the policy's own cameras are unchanged. The
+image is step 1,120, with the robot reaching toward the radio. The rollout was
+stopped at step 1,150 for the picture and has no success or failure result.
+Scene, object and robot assets are part of the BEHAVIOR-1K data bundle and
+are shown as rendered by OmniGibson.
 https://behavior.stanford.edu/challenge/archive/2025/tasks/00_turning_on_radio.html
-https://vimeo.com/1109198872
