@@ -62,3 +62,4 @@
 .model-pair .model-name sub{font-size:.8em;line-height:0;vertical-align:-.2em}
 .finding .model-pair + .note{margin-top:6px}
 .overview-figure{background:white;border:1px solid var(--line);border-radius:3px;padding:24px 26px 20px;margin:0 0 28px}.overview-figure figcaption{max-width:880px;margin:16px auto 0;font-size:12px;line-height:1.7;color:var(--muted)}.overview-figure figcaption strong{color:var(--ink)}@media(max-width:600px){.overview-figure{padding:16px 14px 14px}}
+.hero-copy h2{text-wrap:balance}
