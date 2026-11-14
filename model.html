@@ -51,10 +51,10 @@
   </div>
   <div class="explain second">
     <div class="prose">
-      <h3>The serving rule moves the finish.</h3>
-      <p>One Thor module runs the action policy, System 1, and the reasoning model, System 2. The request is ready at the same moment in all three cases. Only the rule for sharing the GPU changes.</p>
-      <p>These three latencies are measured on the board, not predicted. The scheduler comparison runs the real scheduler on the real module and does not rely on the timing model.</p>
-      <p class="note" id="rule-scope">Measured action latency in the LIBERO comparison on one Thor module. The slices are drawn schematically.</p>
+      <h3>How GPU scheduling affects action latency</h3>
+      <p>We compare System 1 running alone with two co-execution configurations on an NVIDIA Jetson AGX Thor module. GPU time slicing shares the GPU between System 1 and System 2. Action priority temporarily pauses System 2 while System 1 inference runs.</p>
+      <p>The displayed latencies come from hardware measurements during 400 matched LIBERO episodes, using π<sub>0.5</sub> FP8 for System 1 and Qwen3.5-9B NVFP4 for System 2. Each value averages the four suite medians.</p>
+      <p class="note" id="rule-scope">The timelines illustrate the scheduling behavior, with request readiness aligned for comparison.</p>
     </div>
     <div class="panel">
       <div class="seg" role="group" aria-label="Serving rule">

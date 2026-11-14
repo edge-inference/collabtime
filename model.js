@@ -57,7 +57,7 @@ function replay(root, {count, render, interval = 1500}) {
 
 /* 01. One action request under three serving rules; latencies come from results.json. */
 async function initRules() {
-  const {configurations, scope} = await results;
+  const {configurations} = await results;
   const byId = Object.fromEntries(configurations.map(c => [c.id, c]));
   const base = byId.timeslicing.latency_ms;
   const x = ms => 130 + ms * 1.6;
@@ -99,7 +99,6 @@ async function initRules() {
     const button = event.target.closest('button'); if (!button) return;
     press(group, button); render(button.dataset.rule);
   });
-  if (scope) $('rule-scope').textContent = `Measured action latency. ${scope} The slices are drawn schematically.`;
   render('timeslicing');
 }
 
