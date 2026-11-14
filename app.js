@@ -25,44 +25,47 @@ async function init() {
   const response = await fetch('results.json');
   if (!response.ok) throw new Error('Could not load the comparison data.');
   const {configurations} = await response.json();
-  const baseline = configurations.find(c => c.id === 'timeslicing');
-  const descriptions = {
-    priority: 'Brief action priority lowers latency and energy. Phase labels are not required for this configuration.',
-    uniform: 'A uniform 250 ms budget performs similarly to action priority in this comparison.',
-    phase: 'The tested phase budgets allow more overlap, but do not improve task success or energy over action priority.',
-    mps: 'The 50% MPS limit permits higher System 2 throughput than action priority, at higher System 1 latency.',
-    solo: 'System 1 alone is a task-success reference. It does not execute System 2, so its energy is not a matched co-execution comparison.'
+  // Every configuration is drawn at once, as in the paper's figure: one panel per metric,
+  // one vertical bar per configuration, in the order of results.json.
+  const short = {
+    solo: ['System 1', 'alone'], timeslicing: ['GPU time', 'slicing'], mps: ['System 2', 'MPS 50%'],
+    priority: ['Action', 'priority'], uniform: ['Uniform', '250 ms'], phase: ['Phase', 'budgets']
   };
-  function render(selectedId) {
-    const selected = configurations.find(c => c.id === selectedId);
-    const metrics = [
-      ['Action inference latency', 'latency_ms', 300, 'ms', 0],
-      ['Task success', 'success_pct', 100, '%', 1],
-      ['Module energy per episode', 'energy_j', 900, 'J', 0]
-    ];
-    const chart = document.querySelector('#comparison-chart');
-    chart.replaceChildren();
-    for (const [label, key, max, unit, places] of metrics) {
-      const node = document.createElement('div'); node.className = 'metric';
-      const heading = document.createElement('div'); heading.className = 'metric-label';
-      const name = document.createElement('span'); name.textContent = label; heading.append(name);
-      if (key !== 'success_pct' && selected.id !== 'solo') {
-        const change = document.createElement('strong');
-        const reduction = (1-selected[key]/baseline[key])*100;
-        change.textContent = `${Math.abs(reduction).toFixed(0)}% ${reduction >= 0 ? 'lower' : 'higher'}`;
-        heading.append(change);
-      }
-      node.append(heading);
-      for (const [record, css] of [[baseline, ''], [selected, 'selected']]) {
-        const row = document.createElement('div'); row.className = `metric-bar ${css}`;
-        row.setAttribute('aria-label', `${record.label}: ${record[key].toFixed(places)} ${unit}`);
-        const bar = document.createElement('span'); bar.className='bar'; bar.style.width=`${record[key]/max*78}%`;
-        const value = document.createElement('span'); value.className='value'; value.textContent=`${record[key].toFixed(places)} ${unit}`;
-        row.append(bar, value); node.append(row);
-      }
-      chart.append(node);
+  const roles = {timeslicing: 'is-base', priority: 'is-priority', uniform: 'is-uniform'};
+  const baseline = configurations.find(c => c.id === 'timeslicing');
+  const plotHeight = 150;
+  const metrics = [
+    ['Action inference latency (ms)', 'latency_ms', 300, 'ms', 0, '\u224846% lower vs. time slicing', 'gain'],
+    ['Task success (%)', 'success_pct', 100, '%', 1, 'System 1 alone success retained', ''],
+    ['Module energy (J per episode)', 'energy_j', 900, 'J', 0, '\u224813% lower vs. time slicing', 'gain']
+  ];
+  const chart = document.querySelector('#comparison-chart');
+  chart.replaceChildren();
+  for (const [label, key, max, unit, places, hint, hintClass] of metrics) {
+    const node = document.createElement('section'); node.className = 'vb-panel';
+    const head = document.createElement('div'); head.className = 'vb-head';
+    const heading = document.createElement('h4'); heading.className = 'vb-title'; heading.textContent = label;
+    const keyLine = document.createElement('span'); keyLine.className = 'vb-key';
+    keyLine.append(document.createElement('i'), 'GPU time slicing');
+    head.append(heading, keyLine);
+    const sub = document.createElement('p'); sub.className = `vb-hint ${hintClass}`.trim(); sub.textContent = hint;
+    const list = document.createElement('ul'); list.className = 'vb-bars';
+    const line = document.createElement('li'); line.className = 'vb-baseline'; line.setAttribute('aria-hidden', 'true');
+    line.style.top = `${18 + plotHeight - baseline[key]/max*plotHeight}px`;
+    list.append(line);
+    for (const record of configurations) {
+      const col = document.createElement('li'); col.className = `vb-col ${roles[record.id] || ''}`.trim();
+      col.setAttribute('aria-label', `${record.label}: ${record[key].toFixed(places)} ${unit}`);
+      const stack = document.createElement('span'); stack.className = 'vb-stack'; stack.setAttribute('aria-hidden', 'true');
+      const value = document.createElement('span'); value.className = 'vb-val'; value.textContent = record[key].toFixed(places);
+      const bar = document.createElement('span'); bar.className = 'vb-bar';
+      bar.style.height = `${record[key]/max*plotHeight}px`;
+      stack.append(value, bar);
+      const name = document.createElement('span'); name.className = 'vb-name'; name.setAttribute('aria-hidden', 'true');
+      name.append(short[record.id][0], document.createElement('br'), short[record.id][1]);
+      col.append(stack, name); list.append(col);
     }
-    document.querySelector('#comparison-note').textContent = descriptions[selected.id];
+    node.append(head, sub, list); chart.append(node);
   }
   for (const c of configurations) {
     const tr = document.createElement('tr'); if (c.id === 'priority' || c.id === 'uniform') tr.className='highlight';
@@ -71,6 +74,5 @@ async function init() {
     }
     document.querySelector('#result-table').append(tr);
   }
-  bindChoices('#configuration', render);
 }
 init().catch(error => { document.querySelector('#comparison-chart').textContent = error.message; });
