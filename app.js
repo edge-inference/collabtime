@@ -30,7 +30,7 @@ async function init() {
     priority: 'Brief action priority lowers latency and energy. Phase labels are not required for this configuration.',
     uniform: 'A uniform 250 ms budget performs similarly to action priority in this comparison.',
     phase: 'The tested phase budgets allow more overlap, but do not improve task success or energy over action priority.',
-    mps: 'The 50% MPS limit permits higher System 2 throughput than action priority, at higher System 1 latency. It is not an equal-throughput comparison.',
+    mps: 'The 50% MPS limit permits higher System 2 throughput than action priority, at higher System 1 latency.',
     solo: 'System 1 alone is a task-success reference. It does not execute System 2, so its energy is not a matched co-execution comparison.'
   };
   function render(selectedId) {
